@@ -45,6 +45,8 @@ INCLUDES = $(C150LIB)c150dgmsocket.h $(C150LIB)c150nastydgmsocket.h $(C150LIB)c1
 
 all: nastyfiletest makedatafile sha1test
 
+endtoend: endtoend.cpp $(C150AR) $(INCLUDES)
+	$(CPP) -o endtoend $(CPPFLAGS) endtoend.cpp $(C150AR)
 
 #
 # Build the nastyfiletest sample
