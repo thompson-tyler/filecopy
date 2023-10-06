@@ -1,7 +1,24 @@
 #include "messenger.h"
 
-Messenger::Messenger(C150DgmSocket *sock)
-{
+#include <cstring>
+#include <sstream>
+
+using namespace std;
+
+string Messenger::Packet::str() const {
+    stringstream ss;
+    ss << "|vvvvvvvvvvv>" << endl;
+    ss << "|> Packet    " << endl;
+    ss << "|> ------    " << endl;
+    ss << "|> Type:     " << head.type == MESSAGE ? "Message" : "Ack" << endl;
+    ss << "|> Checksum: " << head.checksum << endl;
+    ss << "|> Seq num:  " << head.seqNum << endl;
+    ss << "|> Data:     " << data << endl;
+    ss << "|^^^^^^^^^^^>" << endl;
+    return ss.str();
+}
+
+Messenger::Messenger(C150DgmSocket *sock) {
     this->sock = sock;
     this->sock->turnOnTimeouts(TIMEOUT);
     this->seqNum = 0;
@@ -11,52 +28,55 @@ Messenger::~Messenger() { delete sock; }
 
 void Messenger::sendPacket(Packet p) { sock->write((char *)&p, sizeof(p)); }
 
-void Messenger::sendAck(seqNum_t seqNum)
-{
+void Messenger::sendAck(seqNum_t seqNum) {
     Packet ack;
     ack.head.type = ACK;
     ack.head.seqNum = seqNum;
     sendPacket(ack);
 }
 
-void Messenger::insertChecksum(Packet *p)
-{
+void Messenger::insertChecksum(Packet *p) {
+    // Checksums are calculated on a packet with zero as its existing checksum
+    memset(p->head.checksum, 0, SHA_DIGEST_LENGTH);
     SHA1((const unsigned char *)p, sizeof(*p),
          (unsigned char *)p->head.checksum);
 }
 
-bool Messenger::verifyChecksum(Packet *p)
-{
-    // Remove and save packet checksum
-    unsigned char checksum[SHA_DIGEST_LENGTH];
-    memcpy(checksum, p->head.checksum, SHA_DIGEST_LENGTH);
-    memset(p->head.checksum, 0, SHA_DIGEST_LENGTH);
-    // Recompute checksum
-    unsigned char newChecksum[SHA_DIGEST_LENGTH];
-    SHA1((const unsigned char *)p, sizeof(*p), newChecksum);
-    // Restore packet checksum
-    memcpy(p->head.checksum, checksum, SHA_DIGEST_LENGTH);
-    // Compare checksums
-    return memcmp(checksum, newChecksum, SHA_DIGEST_LENGTH) == 0;
+// Returns true if packet's checksum is valid
+// After a failed checksum, doing anything with the packet is UNDEFINED BEHAVIOR
+bool Messenger::verifyChecksum(Packet *p) {
+    // Extract packet checksum
+    unsigned char incomingChecksum[SHA_DIGEST_LENGTH];
+    memcpy(incomingChecksum, p->head.checksum, SHA_DIGEST_LENGTH);
+
+    // Recalculate checksum
+    insertChecksum(p);
+    bool checksumGood =
+        memcmp(incomingChecksum, p->head.checksum, SHA_DIGEST_LENGTH) == 0;
+    if (!checksumGood) memset(p, 0, sizeof(*p));  // Destroy bad packet
+    return checksumGood;
 }
 
-void Messenger::send(string message)
-{
+void Messenger::send(string message) {
     c150debug->printf(C150APPLICATION, "Sending sequence #%d\n", seqNum);
     // Build packet
     Packet p;
     p.head.type = MESSAGE;
     p.head.seqNum = seqNum;
+
+    // leave room for null terminator
     if (message.length() >= sizeof(p.data)) {
         fprintf(stderr, "Tried to send a message that's too long\n");
         exit(EXIT_FAILURE);
     }
-    strcpy(p.data, message.c_str());
+
+    // null terminates
+    strlcpy(p.data, message.c_str(), sizeof(p.data));
     insertChecksum(&p);
 
     // Send packet
-    bool acked = false;
-    while (!acked) {
+    bool receivedAck = false;
+    while (!receivedAck) {
         sendPacket(p);
         Packet ack;
         ssize_t readlen = sock->read((char *)&ack, sizeof(ack));
@@ -71,7 +91,7 @@ void Messenger::send(string message)
                               "Got a packet with unexpected size %d\n",
                               readlen);
         } else if (ack.head.type == ACK && ack.head.seqNum == seqNum) {
-            acked = true;
+            receivedAck = true;
         }
     }
 
@@ -79,8 +99,7 @@ void Messenger::send(string message)
     seqNum++;
 }
 
-string Messenger::read()
-{
+string Messenger::read() {
     // Read packet
     bool read = false;
     Packet p;

@@ -1,10 +1,12 @@
-#include "c150debug.h"
-#include "c150nastydgmsocket.h"
-#include <cstdlib>
-#include <fstream>
 #include <openssl/sha.h>
 
-using namespace C150NETWORK; // for all the comp150 utilities
+#include <cstdlib>
+#include <fstream>
+
+#include "c150debug.h"
+#include "c150nastydgmsocket.h"
+
+using namespace C150NETWORK;  // for all the comp150 utilities
 using namespace std;
 
 enum MessageType {
@@ -49,10 +51,9 @@ struct Packet {
 const int NASTINESS = 0;
 const size_t PACKET_SIZE = sizeof(Packet);
 
-int main(int argc, char *argv[])
-{
-    ssize_t readlen;              // amount of data read from socket
-    char messageBuf[PACKET_SIZE]; // received message data
+int main(int argc, char *argv[]) {
+    ssize_t readlen;               // amount of data read from socket
+    char messageBuf[PACKET_SIZE];  // received message data
 
     if (argc != 2) {
         fprintf(stderr, "usage: %s [server|client]\n", argv[0]);
@@ -91,7 +92,6 @@ int main(int argc, char *argv[])
         printf("Exiting server\n");
 
     } else if (strcmp(argv[1], "client") == 0) {
-
         char host[] = "comp117-02";
         // Tell the DGMSocket which server to talk to
         sock->setServerName(host);
@@ -101,8 +101,7 @@ int main(int argc, char *argv[])
             char msg[128];
             fgets(msg, sizeof(msg), stdin);
 
-            if (strcmp(msg, "quit\n") == 0)
-                break;
+            if (strcmp(msg, "quit\n") == 0) break;
 
             Packet packet;
             packet.header.type = MessageType::GIVE_NEXT_BLOB;

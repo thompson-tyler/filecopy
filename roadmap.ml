@@ -15,12 +15,15 @@ exception NetworkError
 exception NeedsResend
 exception WaitForAnotherMessage
 
-type clientmessage = CheckIsNecessary of { filename : string; filehash : int }
+type clientmessage =
+  | CheckIsNecessary of { filename : string; filehash : int }
+  | ClientAck
 
 type servermessage =
   | PleaseCheck of { filename : string; checksum : int }
   | FileGood of { filename : string }
   | FileBad of { filename : string }
+  | ServerAck
 
 type packet = header * message
 and header = { checksum : int; time_sent : int; uuid : int; size : int }
@@ -63,6 +66,10 @@ let send_and_receive packet (unpack_response_packet : packet -> 'a option) =
     let is_fresh_packet sent recv = (fst sent).uuid < (fst recv).uuid in
     let max_retries = 6 in
 
+    let response_is_valid sent recv =
+      hdr_checksum_good recv && is_fresh_packet sent_packet recv
+    in
+
     let rec get_valid_response () =
       match read_blocking () with
       (* can ignore header since these are just abstractions *)
@@ -71,16 +78,14 @@ let send_and_receive packet (unpack_response_packet : packet -> 'a option) =
           (* freshen the header and resend the sent packet data *)
           send_and_receive_rec (attempt_no + 1) unpack_fn
             (mk_fresh_packet (snd sent_packet))
-      (* got a valid message *)
       | (recv_hdr, recv_msg) as recv_packet
-        when hdr_checksum_good recv_packet
-             && is_fresh_packet sent_packet recv_packet -> (
+        when response_is_valid sent_packet recv_packet -> (
           match unpack_fn recv_packet with
           | Some expected_response_data -> expected_response_data
           | None -> get_valid_response ())
       (* read more packets, might have to read until timeout *)
       (* TODO: What if bad packets keep spamming after good packet dropped?
-               How can it know to resend? *)
+               How can it know to resend? Are timeouts a reliable indicator of failure? *)
       | _ -> get_valid_response ()
     in
     get_valid_response ()

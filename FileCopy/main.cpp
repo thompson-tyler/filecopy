@@ -1,24 +1,23 @@
-#include "c150debug.h"
-#include "c150nastydgmsocket.h"
-#include "messenger.h"
 #include <cstdlib>
 #include <iostream>
 
-using namespace C150NETWORK; // for all the comp150 utilities
+#include "c150debug.h"
+#include "c150nastydgmsocket.h"
+#include "messenger.h"
+
+using namespace C150NETWORK;  // for all the comp150 utilities
 using namespace std;
 
 const int NASTINESS = 4;
 
 void setUpDebugLogging(const char *logname, int argc, char *argv[]);
 
-void printUsage(char *progname)
-{
+void printUsage(char *progname) {
     cerr << "Usage: " << progname << " [server|client]" << endl;
     exit(1);
 }
 
-void runClient()
-{
+void runClient() {
     fprintf(stderr, "Running client\n");
 
     char host[] = "comp117-02";
@@ -36,8 +35,7 @@ void runClient()
     }
 }
 
-void runServer()
-{
+void runServer() {
     fprintf(stderr, "Running server\n");
 
     C150DgmSocket *sock = new C150NastyDgmSocket(NASTINESS);
@@ -50,8 +48,7 @@ void runServer()
     }
 }
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
     if (argc != 2) {
         printUsage(argv[0]);
         return EXIT_FAILURE;
@@ -78,9 +75,7 @@ int main(int argc, char *argv[])
     return EXIT_SUCCESS;
 }
 
-void setUpDebugLogging(const char *logname, int argc, char *argv[])
-{
-
+void setUpDebugLogging(const char *logname, int argc, char *argv[]) {
     //
     //           Choose where debug output should go
     //
