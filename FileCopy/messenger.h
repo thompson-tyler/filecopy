@@ -38,9 +38,9 @@ class Messenger {
     const static int TIMEOUT = 1000;
 
     C150NETWORK::C150DgmSocket *m_sock;
-    seqNum_t m_seqNum;
+    seq_t m_seqno;
 
-    unordered_map<seqNum_t, seqNum_t> m_seqMap;
+    unordered_map<seq_t, Packet> m_seqmap;
 };
 
 #endif

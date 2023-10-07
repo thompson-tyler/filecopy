@@ -1,6 +1,8 @@
 #ifndef FILECACHE_H
 #define FILECACHE_H
 
+#include <_types/_uint8_t.h>
+
 #include <tuple>
 #include <unordered_map>
 #include <vector>
@@ -14,32 +16,35 @@
 
 class Filecache {
    public:
-    // returns true if needs SOS, this function is idempotent — re-receiving an
-    // old message will never cause harm
-    bool tell(const Message *msg);
+    // tell the filecache what to do
+    // returns:
+    //  zero => drop the packet
+    //  pos  => respond with ack
+    //  neg  => respond with SOS
+    int tell(const Message *msg);
 
    private:
     struct FileStatus {
-        enum { FileGood, FileBad, FileWaiting } status;
+        enum { Verified, Tmp, Partial } status;
         union {
-            int n_parts;
-        };
+            uint8_t *expected_checksum[SHA_DIGEST_LENGTH];
+        } meta;
     };
 
     // no need to be careful about repeatedly calling these
-    bool idempotentFileIsGood(const std::string filename, seqNum_t seqno);
-    void idempotentKeepBlob(const std::string id, seqNum_t seqno);
-    void idempotentDeleteBlob(const std::string id, seqNum_t seqno);
-    void idempotentPrepareForBlob(const std::string id, ssize_t nparts,
-                                  seqNum_t seqno);
-    void idempotentStoreBlobChunk(const std::string id, ssize_t partno,
-                                  char *data, uint32_t numBytes);
+    bool idempotentFileIsGood(const std::string filename, seq_t seqno);
+    void idempotentSaveFile(const std::string filename, seq_t seqno);
+    void idempotentDeleteTmp(const std::string filename, seq_t seqno);
+    void idempotentPrepareForFile(const std::string filename, seq_t seqno,
+                                  ssize_t nparts);
+    void idempotentStoreBlobChunk(const std::string filename, seq_t seqno,
+                                  ssize_t partno, uint8_t *data, uint32_t len);
 
     /*************************************************************************
      * filename -> ( FileStatus, min seq for redo, [ filecontents1, ... ] )  *
      *************************************************************************/
     unordered_map<std::string,
-                  std::tuple<FileStatus, seqNum_t, std::vector<char *>>>
+                  std::tuple<FileStatus, seq_t, std::vector<uint8_t *>>>
         m_cache;
 };
 

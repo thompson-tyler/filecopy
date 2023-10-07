@@ -6,36 +6,28 @@
 #include "c150dgmsocket.h"
 #include "messenger.h"
 
-typedef uint32_t seqNum_t;
+typedef uint32_t seq_t;
+
+struct Header {
+    MessageType type;
+    seq_t seqno;
+    // size of data contents
+    u_int32_t len = 0;
+};
 
 struct Packet {
-    //
-    // data members
-    //
-    struct {
-        MessageType type;
-        seqNum_t seqno;
-        // update if size changes later
-        u_int32_t size = C150NETWORK::MAXDGMSIZE;
-        char checksum[SHA_DIGEST_LENGTH];
-    } header;
-    char data[C150NETWORK::MAXDGMSIZE - sizeof(header)];
+    Header hdr;
+    uint8_t data[C150NETWORK::MAXDGMSIZE - sizeof(hdr)];
 
     //
     // interface
     //
-
-    Packet();                  // empty packet
-    Packet(char *fromBuffer);  // deserialize
-    ~Packet();
-    void toBuffer(char *buffer);  // serialize
-
-    // If checksum is valid returns true,
-    // otherwise returns false and destroys the contents of the packet
-    bool verifyChecksum();
-    int insertChecksum();
-
-    std::string toString();  // for debugging
+    Packet();                        // zeroed out
+    Packet(uint8_t *fromBuffer);     // deserialize
+    void toBuffer(uint8_t *buffer);  // serialize
+    std::string toString();          // for debugging
 };
+
+const int MAX_PACKET_SIZE = C150NETWORK::MAXDGMSIZE - sizeof(Header);
 
 #endif

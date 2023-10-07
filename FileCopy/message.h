@@ -43,7 +43,7 @@ struct BlobSection {
     std::string filename;
     uint32_t partno;
     uint32_t size;
-    char *data;
+    uint8_t *data;
 };
 
 // Messages inherit from this virtual class
@@ -79,7 +79,7 @@ class Message {
     void ofDeleteIt(std::string filename);
     void ofPrepareForBlob(std::string filename, uint32_t nparts);
     void ofBlobSection(std::string filename, uint32_t partno, uint32_t size,
-                       char *data);
+                       uint8_t *data);
 
    private:
     MessageType m_type;

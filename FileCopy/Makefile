@@ -43,12 +43,14 @@ C150AR = $(C150LIB)c150ids.a
 LDFLAGS = 
 INCLUDES = $(C150LIB)c150dgmsocket.h $(C150LIB)c150nastydgmsocket.h $(C150LIB)c150network.h $(C150LIB)c150exceptions.h $(C150LIB)c150debug.h $(C150LIB)c150utility.h messenger.h
 
+OBJ = filecache.o messenger.o responder.o packet.o manager.o message.o
+
 all: nastyfiletest makedatafile sha1test
 
 endtoend: endtoend.cpp $(C150AR) $(INCLUDES)
 	$(CPP) -o endtoend $(CPPFLAGS) endtoend.cpp $(C150AR)
 
-main: main.cpp $(C150AR) $(INCLUDES)
+main: main.cpp $(C150AR) $(INCLUDES) $(OBJ)
 	$(CPP) -o main $(CPPFLAGS) main.cpp $(C150AR) messenger.cpp
 
 #
@@ -72,9 +74,8 @@ makedatafile: makedatafile.cpp
 #
 # To get any .o, compile the corresponding .cpp
 #
-%.o:%.cpp  $(INCLUDES)
-	$(CPP) -c  $(CPPFLAGS) $< 
-
+%.o: %.cpp  $(INCLUDES)
+	$(CPP) -c $(CPPFLAGS) $< -o $@ 
 
 #
 # Delete all compiled code in preparation
