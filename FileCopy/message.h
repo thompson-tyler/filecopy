@@ -3,8 +3,6 @@
 
 #include "packet.h"
 
-// TODO: reimplement using a tagged union pattern
-
 // All message types, doesn't discriminate on origin of client vs server
 // clang-format off
 enum MessageType {
@@ -23,76 +21,75 @@ enum MessageType {
 };
 // clang-format on
 
-// Messages inherit from this virtual class
-class Message {
-   public:
-    Message(Packet *fromPacket);  // a big switch statement inside here
-    virtual MessageType type();
-    virtual Packet toPacket();
-    virtual std::string toString();
-};
-
-/*
- * SERVER SIDE
- */
-
-class Sos : Message {
-   public:
-    MessageType type() { return MessageType::SOS; }
-};
-
-// On a bit level ack is just any packet with a special bit hack
-class Ack : Message {
-   public:
-    Ack();
-    // returns the same packet it received just with an additional ACK bit set
-    Ack(Packet *fromPacket);
-
-    MessageType type() { return MessageType::ACK; }
-    Packet *p = nullptr;
-};
-
-/*
- * CLIENT SIDE
- */
-
-class CheckIsNecessary : Message {
-   public:
-    CheckIsNecessary(std::string filename);
-    MessageType type() { return MessageType::CHECK_IS_NECESSARY; }
+// possible message values
+struct CheckIsNecessary {
     std::string filename;
 };
 
-class KeepIt : Message {
-   public:
-    KeepIt(std::string filename);
-    MessageType type() { return MessageType::KEEP_IT; }
+struct KeepIt {
     std::string filename;
 };
 
-class DeleteIt : Message {
-   public:
-    DeleteIt(std::string filename);
-    MessageType type() { return MessageType::DELETE_IT; }
+struct DeleteIt {
     std::string filename;
 };
 
-class PrepareForBlob : Message {
-   public:
-    PrepareForBlob(std::string filename, uint32_t nparts);
-    MessageType type() { return MessageType::PREPARE_FOR_BLOB; }
+struct PrepareForBlob {
     std::string filename;
     uint32_t nparts;
 };
 
-class BlobSection : Message {
-   public:
-    BlobSection(std::string filename, uint32_t partno);
-    MessageType type() { return MessageType::BLOB_SECTION; }
+struct BlobSection {
     std::string filename;
     uint32_t partno;
     uint32_t size;
     char *data;
+};
+
+// Messages inherit from this virtual class
+class Message {
+   public:
+    Message();                    // BEWARE defaults to SOS
+    Message(Packet *fromPacket);  // a big switch statement inside here
+    ~Message();
+
+    Packet toPacket();
+
+    const MessageType type();
+
+    // returns nullptr if invalid access
+    const CheckIsNecessary *getCheckIsNecessary();
+    const KeepIt *getKeepIt();
+    const DeleteIt *getDeleteIt();
+    const PrepareForBlob *getPrepareForBlob();
+    const BlobSection *getBlobSection();
+
+    std::string toString();  // for debug
+
+    // constructors e.g.
+    // `Message m = Message().ofDeleteIt("myfile");`
+
+    /* server side */
+    void ofAck();
+    void ofSOS();
+
+    /* client side */
+    void ofCheckIsNecessary(std::string filename);
+    void ofKeepIt(std::string filename);
+    void ofDeleteIt(std::string filename);
+    void ofPrepareForBlob(std::string filename, uint32_t nparts);
+    void ofBlobSection(std::string filename, uint32_t partno, uint32_t size,
+                       char *data);
+
+   private:
+    MessageType m_type;
+    union {
+        CheckIsNecessary check;
+        KeepIt keep;
+        DeleteIt del;
+        PrepareForBlob prep;
+        BlobSection section;
+    } m_value;
 };
 
 #endif
