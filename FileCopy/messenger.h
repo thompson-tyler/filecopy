@@ -1,5 +1,5 @@
-#ifndef MESSENGER
-#define MESSENGER
+#ifndef MESSENGER_H
+#define MESSENGER_H
 
 #include <openssl/sha.h>
 
