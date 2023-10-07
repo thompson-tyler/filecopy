@@ -5,48 +5,10 @@
 
 #include "c150debug.h"
 #include "c150nastydgmsocket.h"
+#include "packet.h"
 
 using namespace C150NETWORK;  // for all the comp150 utilities
 using namespace std;
-
-enum MessageType {
-    // server messages
-    HERES_A_BLOB,
-    HERES_A_SECTION,
-    // client messages
-    GIVE_NEXT_BLOB,
-    SECTION_LOOKS_GOOD,
-    SECTION_LOOKS_BAD,
-    RESEND_BLOB,
-    // both
-    DONE,
-};
-
-struct Packet {
-    Header hdr;
-    union {
-        struct {
-            int uuid;
-            int part_number;
-        } startBlob;
-    } data;
-};
-
-Packet p = getpacket();
-if (p.hdr.type == HERES_A_BLOB) {
-    p.data.startBlob;
-}
-
-struct Header {
-    int checksum;
-    MessageType type;
-    int size;
-};
-
-struct Packet {
-    Header header;
-    char data[BUFSIZ];
-};
 
 const int NASTINESS = 0;
 const size_t PACKET_SIZE = sizeof(Packet);

@@ -4,46 +4,43 @@
 #include <openssl/sha.h>
 
 #include <string>
+#include <unordered_map>
 
 #include "c150dgmsocket.h"
 #include "c150grading.h"
 #include "c150nastydgmsocket.h"
-
-using namespace C150NETWORK;  // for all the comp150 utilities
+#include "message.h"
+#include "packet.h"
 
 class Messenger {
-   private:
-    typedef uint32_t seqNum_t;
-    enum PacketType {
-        MESSAGE,
-        ACK,
-    };
-    struct Header {
-        char checksum[SHA_DIGEST_LENGTH];
-        PacketType type;
-        seqNum_t seqNum;
-    };
-    struct Packet {
-        Header head;
-        char data[MAXDGMSIZE - sizeof(Header)];
-        string str() const;
-    };
+   public:
+    Messenger(C150NETWORK::C150DgmSocket *sock);
+    ~Messenger();
 
+    // Sends a message and makes sure it is acknowledged.
+    // Returns true if successful, aborts and returns false if SOS (TODO: make
+    // sure this is what we want).
+    bool send(std::vector<Message> messages);
+
+    // 1. Creates and sends client Message of PREPARE_FOR_BLOB and waits until
+    // it's acknowledged.
+    // 2. Then splits blob into sections and sends them, making sure all are
+    // acknowledged
+    //
+    // Returns true if successful, aborts and returns false if SOS (TODO: make
+    // sure this is what we want).
+    bool sendBlob(std::string blob, std::string blobName);
+
+   private:
+    std::vector<Message> partitionBlob(std::string blob);
+
+    std::string read();
     const static int TIMEOUT = 1000;
 
-    C150DgmSocket *sock;
-    seqNum_t seqNum;
+    C150NETWORK::C150DgmSocket *m_sock;
+    seqNum_t m_seqNum;
 
-    void sendPacket(Packet p);
-    void sendAck(seqNum_t seqNum);
-    void insertChecksum(Packet *p);
-    bool verifyChecksum(Packet *p);
-
-   public:
-    Messenger(C150DgmSocket *sock);
-    ~Messenger();
-    void send(std::string message);
-    std::string read();
+    unordered_map<seqNum_t, seqNum_t> m_seqMap;
 };
 
 #endif
