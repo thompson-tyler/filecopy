@@ -52,20 +52,18 @@ bool Messenger::send(const vector<Message> &messages) {
         // Read loop - wait for ACKs and remove from resend queue
         while (true) {
             ssize_t len = m_sock->read(buffer, MAX_PACKET_SIZE);
+            // TODO: should bad len break like a timeout or just continue?
             if (m_sock->timedout() || len == 0) break;
 
             // This could be unsafe if packet is malformed, TODO: safety check
             // somehow? we may also just decide to fully trust the server
             Packet p = Packet((uint8_t *)buffer);
-            seq_t recvseq = p.hdr.seqno;
-            if (recvseq < minseq) {
+            if (p.hdr.seqno < minseq)
                 continue;
-            } else if (p.hdr.type == ACK) {
-                m_seqmap.erase(recvseq);
-            } else if (p.hdr.type == SOS) {
-                // Something went wrong
+            else if (p.hdr.type == ACK)
+                m_seqmap.erase(p.hdr.seqno);
+            else if (p.hdr.type == SOS)  // Something went wrong
                 return false;
-            }
         }
     }
 
