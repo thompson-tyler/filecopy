@@ -26,13 +26,13 @@ using namespace C150NETWORK;
 // TODO: make fileread return -1 if file doesn't exist
 
 // what we'd do if there was no nastiness
-uint32_t fileToBufferNaive(NASTYFILE *nfp, string srcfile, uint8_t **buffer_pp);
+int fileToBufferNaive(NASTYFILE *nfp, string srcfile, uint8_t **buffer_pp);
 bool bufferToFileNaive(NASTYFILE *nfp, string srcfile, uint8_t *buffer,
                        uint32_t bufferlen);
 
 // these have an end to end check
-uint32_t fileToBufferSecure(NASTYFILE *nfp, string srcfile, uint8_t **buffer_pp,
-                            unsigned char checksum[SHA_LEN]);
+int fileToBufferSecure(NASTYFILE *nfp, string srcfile, uint8_t **buffer_pp,
+                       unsigned char checksum[SHA_LEN]);
 // these have an end to end check
 bool bufferToFileSecure(NASTYFILE *nfp, string srcfile, uint8_t *buffer,
                         uint32_t bufferlen);
@@ -40,8 +40,8 @@ bool bufferToFileSecure(NASTYFILE *nfp, string srcfile, uint8_t *buffer,
 // returns -1 in disk error
 // guarantees that file read off disk is correct by trying repeatedly and
 // matching hashcodes
-uint32_t fileToBuffer(NASTYFILE *nfp, string dir, string filename,
-                      uint8_t **buffer_pp, unsigned char checksum[SHA_LEN]) {
+int fileToBuffer(NASTYFILE *nfp, string dir, string filename,
+                 uint8_t **buffer_pp, unsigned char checksum[SHA_LEN]) {
     string srcfile = makeFileName(dir, filename);
     return fileToBuffer(nfp, srcfile, buffer_pp, checksum);
 }
@@ -52,8 +52,8 @@ bool bufferToFile(NASTYFILE *nfp, string dir, string filename, uint8_t *buffer,
     return bufferToFile(nfp, srcfile, buffer, bufferlen);
 }
 
-uint32_t fileToBuffer(NASTYFILE *nfp, string srcfile, uint8_t **buffer_pp,
-                      unsigned char checksum[SHA_LEN]) {
+int fileToBuffer(NASTYFILE *nfp, string srcfile, uint8_t **buffer_pp,
+                 unsigned char checksum[SHA_LEN]) {
     if (!isFile(srcfile)) {
         fprintf(stderr, "%s is not a file", srcfile.c_str());
         return -1;
@@ -73,12 +73,15 @@ bool bufferToFile(NASTYFILE *nfp, string srcfile, uint8_t *buffer,
 
 // Brute force secure read
 // needs to have 2 flawless of n reads
-uint32_t fileToBufferSecure(NASTYFILE *nfp, string srcfile, uint8_t **buffer_pp,
-                            unsigned char checksumOut[SHA_LEN]) {
+int fileToBufferSecure(NASTYFILE *nfp, string srcfile, uint8_t **buffer_pp,
+                       unsigned char checksumOut[SHA_LEN]) {
     unsigned char checksums[MAX_DISK_RETRIES][SHA_LEN];
     for (int i = 0; i < MAX_DISK_RETRIES; i++) {  // for each try
         uint8_t *buffer = nullptr;
-        uint8_t buflen = fileToBufferNaive(nfp, srcfile, &buffer);
+        int buflen = fileToBufferNaive(nfp, srcfile, &buffer);
+        if (buflen == -1) {
+            return -1;
+        }
         SHA1(buffer, buflen, checksums[i]);
         for (int j = 0; j < i; j++) {  // for each past checksum
             if (memcmp(checksums[j], checksums[i], SHA_LEN) == 0) {
@@ -96,8 +99,7 @@ uint32_t fileToBufferSecure(NASTYFILE *nfp, string srcfile, uint8_t **buffer_pp,
     return -1;
 }
 
-uint32_t fileToBufferNaive(NASTYFILE *nfp, string srcfile,
-                           uint8_t **buffer_pp) {
+int fileToBufferNaive(NASTYFILE *nfp, string srcfile, uint8_t **buffer_pp) {
     if (*buffer_pp != nullptr) {
         fprintf(stderr, "CANNOT pass fileToBuffer reference to non-null ptr\n");
         exit(EXIT_FAILURE);
@@ -110,7 +112,7 @@ uint32_t fileToBufferNaive(NASTYFILE *nfp, string srcfile,
     if (lstat(srcfile.c_str(), &statbuf) != 0) {
         fprintf(stderr, "copyFile: Error stating supplied source file %s\n",
                 srcfile.c_str());
-        exit(20);
+        return -1;
     }
 
     uint8_t *buffer = (uint8_t *)malloc(statbuf.st_size);
@@ -118,22 +120,24 @@ uint32_t fileToBufferNaive(NASTYFILE *nfp, string srcfile,
     void *fopenretval = nfp->fopen(srcfile.c_str(), "rb");
     if (fopenretval == NULL) {
         cerr << "Error opening input file " << srcfile << endl;
-        exit(12);
+        free(buffer);
+        return -1;
     }
 
     uint32_t len = nfp->fread(buffer, 1, statbuf.st_size);
     if (len != statbuf.st_size) {
         cerr << "Error reading input file " << srcfile << endl;
-        exit(16);
+        free(buffer);
+        return -1;
     }
 
-    free(*buffer_pp);
-    *buffer_pp = buffer;
     if (nfp->fclose() != 0) {
         cerr << "Error closing input file " << srcfile << endl;
-        exit(16);
+        free(buffer);
+        return -1;
     }
 
+    *buffer_pp = buffer;
     return len;
 }
 

@@ -28,7 +28,7 @@ Filecache::Filecache(string dir, C150NastyFile *nfp) {
 bool Filecache::filecheck(string filename, checksum_t checksum) {
     uint8_t *buffer;
     uint8_t diskChecksum[SHA_DIGEST_LENGTH];
-    uint32_t len = fileToBuffer(m_nfp, filename, &buffer, diskChecksum);
+    int len = fileToBuffer(m_nfp, filename, &buffer, diskChecksum);
 
     if (len == -1) return SOS;
 
@@ -40,7 +40,7 @@ bool Filecache::filecheck(string filename, checksum_t checksum) {
 bool Filecache::idempotentCheckfile(const string filename, seq_t seqno,
                                     checksum_t checksum) {
     if (!m_cache.count(filename)) {
-        return filecheck(makeFileName(m_dir, filename));
+        return filecheck(makeFileName(m_dir, filename), checksum);
     }
 
     auto &entry = m_cache[filename];
