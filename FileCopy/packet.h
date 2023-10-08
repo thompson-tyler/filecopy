@@ -27,6 +27,7 @@ struct Packet {
     std::string toString();          // for debugging
 };
 
-const int MAX_PACKET_SIZE = C150NETWORK::MAXDGMSIZE - sizeof(Header);
+const int MAX_PACKET_SIZE = C150NETWORK::MAXDGMSIZE;
+const int MAX_DATA_SIZE = C150NETWORK::MAXDGMSIZE - sizeof(Header);
 
 #endif

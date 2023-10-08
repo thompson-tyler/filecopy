@@ -9,6 +9,7 @@
 #include "c150nastydgmsocket.h"
 #include "message.h"
 #include "packet.h"
+#include "settings.h"
 
 class Messenger {
    public:
@@ -30,10 +31,9 @@ class Messenger {
     bool sendBlob(std::string blob, std::string blobName);
 
    private:
-    std::vector<Message> partitionBlob(std::string blob);
+    std::vector<Message> partitionBlob(std::string blob, std::string blobName);
 
     std::string read();
-    const static int TIMEOUT = 1000;
 
     C150NETWORK::C150DgmSocket *m_sock;
     seq_t m_seqno;

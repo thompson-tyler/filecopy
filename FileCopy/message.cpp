@@ -52,7 +52,7 @@ Message Message::ofPrepareForBlob(string filename, uint32_t nparts) {
 }
 
 Message Message::ofBlobSection(string filename, uint32_t partno, uint32_t len,
-                               uint8_t *data) {
+                               const uint8_t *data) {
     m_type = PREPARE_FOR_BLOB;
     m_filename = filename;
     m_value.section.partno = partno;

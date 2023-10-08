@@ -72,7 +72,7 @@ class Message {
     Message ofDeleteIt(std::string filename);
     Message ofPrepareForBlob(std::string filename, uint32_t nparts);
     Message ofBlobSection(std::string filename, uint32_t partno, uint32_t size,
-                          uint8_t *data);
+                          const uint8_t *data);
 
     /* server side */
     Message intoAck();
