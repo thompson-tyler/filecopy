@@ -23,6 +23,8 @@
 using namespace std;
 using namespace C150NETWORK;
 
+// TODO: make fileread return -1 if file doesn't exist
+
 // what we'd do if there was no nastiness
 uint32_t fileToBufferNaive(NASTYFILE *nfp, string srcfile, uint8_t **buffer_pp);
 bool bufferToFileNaive(NASTYFILE *nfp, string srcfile, uint8_t *buffer,

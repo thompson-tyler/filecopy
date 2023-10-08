@@ -18,16 +18,31 @@ using namespace std;
 #define ACK true
 #define SOS false
 
+typedef const unsigned char checksum_t[SHA_DIGEST_LENGTH];
+
 Filecache::Filecache(string dir, C150NastyFile *nfp) {
     m_dir = dir;
     m_nfp = nfp;
 }
 
+bool Filecache::filecheck(string filename, checksum_t checksum) {
+    uint8_t *buffer;
+    uint8_t diskChecksum[SHA_DIGEST_LENGTH];
+    uint32_t len = fileToBuffer(m_nfp, filename, &buffer, diskChecksum);
+
+    if (len == -1) return SOS;
+
+    free(buffer);  // forget the buffer for now
+    return (memcmp(diskChecksum, checksum, SHA_DIGEST_LENGTH)) ? SOS : ACK;
+}
+
 // no need to be careful about repeatedly calling these
-bool Filecache::idempotentCheckfile(
-    const string filename, seq_t seqno,
-    const unsigned char checksum[SHA_DIGEST_LENGTH]) {
-    if (!m_cache.count(filename)) return SOS;
+bool Filecache::idempotentCheckfile(const string filename, seq_t seqno,
+                                    checksum_t checksum) {
+    if (!m_cache.count(filename)) {
+        return filecheck(makeFileName(m_dir, filename));
+    }
+
     auto &entry = m_cache[filename];
     switch (entry.status) {
         case FileStatus::PARTIAL:  // something is wrong
@@ -40,14 +55,7 @@ bool Filecache::idempotentCheckfile(
             // During TMP, seqno is always the most recent check
             entry.seqno = seqno;
 
-            // Do file check
-            uint8_t *buffer;
-            uint8_t diskChecksum[SHA_DIGEST_LENGTH];
-            fileToBuffer(m_nfp, m_dir, filename, &buffer, diskChecksum);
-            free(buffer);  // forget the buffer for now
-
-            if (memcmp(diskChecksum, checksum,
-                       SHA_DIGEST_LENGTH))  // check failed
+            if (!filecheck(makeTmpFileName(m_dir, filename), checksum))
                 return SOS;
             entry.status = FileStatus::VERIFIED;  // check success
             return ACK;

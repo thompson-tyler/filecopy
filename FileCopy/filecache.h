@@ -30,6 +30,9 @@ class Filecache {
                                   uint32_t partno, uint8_t *data, uint32_t len);
 
    private:
+    bool filecheck(string filename,
+                   const unsigned char checksum[SHA_DIGEST_LENGTH]);
+
     enum FileStatus { PARTIAL, TMP, VERIFIED, SAVED };
     struct FileSegment {
         uint32_t len = 0;
