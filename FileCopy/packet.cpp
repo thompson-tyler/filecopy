@@ -5,32 +5,23 @@
 
 using namespace std;
 
+Packet::Packet() {
+    hdr.type = SOS;
+    hdr.seqno = -1;
+    hdr.len = 0;
+    memset(data, 0, sizeof(data));
+}
+
+// TODO: add variable length reads !!!
 Packet::Packet(uint8_t *fromBuffer) {
     Packet *p = (Packet *)(fromBuffer);
     hdr = p->hdr;
-    memcpy(data, p->data, MAX_PACKET_SIZE);
+    memcpy(data, p->data, p->hdr.len);
 }
 
 void Packet::toBuffer(uint8_t *buffer) { memcpy(buffer, this, sizeof(*this)); }
 
-string messageToString(MessageType m) {
-    switch (m) {
-        case ACK:
-            return "ACK";
-        case CHECK_IS_NECESSARY:
-            return "Check is necessary";
-        case KEEP_IT:
-            return "Save file";
-        case DELETE_IT:
-            return "Delete file";
-        case PREPARE_FOR_BLOB:
-            return "Prepare for file";
-        case BLOB_SECTION:
-            return "Section of file";
-        default:
-            return "SOS";
-    }
-}
+uint32_t Packet::totalSize() { return sizeof(hdr) + hdr.len; }
 
 string Packet::toString() {
     stringstream ss;

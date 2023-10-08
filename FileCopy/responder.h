@@ -20,6 +20,7 @@ class ServerResponder {
     Filecache m_cache;
 };
 
-void serverListen(C150NETWORK::C150DgmSocket *sock, ServerResponder responder);
+void serverListen(C150NETWORK::C150DgmSocket *sock,
+                  C150NETWORK::C150NastyFile *nfp, ServerResponder responder);
 
 #endif

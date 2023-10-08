@@ -7,10 +7,10 @@
 typedef int seq_t;
 
 struct Header {
-    MessageType type = SOS;
-    seq_t seqno = -1;
-    // size of data contents
-    u_int32_t len = 0;
+    MessageType type;
+    seq_t seqno;
+    // size of data contents!! Doesn't include header
+    u_int32_t len;
 };
 
 struct Packet {
@@ -20,8 +20,10 @@ struct Packet {
     //
     // interface
     //
+    Packet();
     Packet(uint8_t *fromBuffer);     // deserialize
     void toBuffer(uint8_t *buffer);  // serialize
+    uint32_t totalSize();            // <= sizeof(Packet)
     std::string toString();          // for debugging
 };
 
