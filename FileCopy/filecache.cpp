@@ -24,9 +24,9 @@ Filecache::Filecache(string dir, C150NastyFile *nfp) {
 }
 
 // no need to be careful about repeatedly calling these
-bool Filecache::idempotentCheckfile(const string filename,
-                                    unsigned char checksum[SHA_DIGEST_LENGTH],
-                                    seq_t seqno) {
+bool Filecache::idempotentCheckfile(
+    const string filename, seq_t seqno,
+    const unsigned char checksum[SHA_DIGEST_LENGTH]) {
     if (!m_cache.count(filename)) return SOS;
     auto &entry = m_cache[filename];
     switch (entry.status) {

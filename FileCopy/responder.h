@@ -8,19 +8,21 @@
 
 class ServerResponder {
    public:
-    ServerResponder();
-    ~ServerResponder();
+    ServerResponder(Filecache *m_cache);
 
     // given a client packet the corresponding packet responds with a matching
     // seq number — also hands off the incoming packet to the Filecache to do
     // idempotent stuff
-    Packet bounce(Packet p);
+    //
+    // modifies packet IN PLACE
+    void bounce(Packet *p);
 
    private:
-    Filecache m_cache;
+    Filecache *m_cache;
 };
 
-void serverListen(C150NETWORK::C150DgmSocket *sock,
-                  C150NETWORK::C150NastyFile *nfp, ServerResponder responder);
+// main server call
+void listen(C150NETWORK::C150DgmSocket *sock, C150NETWORK::C150NastyFile *nfp,
+            std::string dir);
 
 #endif

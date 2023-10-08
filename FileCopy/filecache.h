@@ -9,7 +9,6 @@
 #include <vector>
 
 #include "c150nastyfile.h"
-#include "message.h"
 #include "messenger.h"
 
 /***
@@ -21,22 +20,14 @@ class Filecache {
     Filecache(std::string dir, C150NETWORK::C150NastyFile *nfp);
 
     // no need to be careful about repeatedly calling these
-    bool idempotentCheckfile(const std::string filename,
-                             unsigned char checksum[SHA_DIGEST_LENGTH],
-                             seq_t seqno);
+    bool idempotentCheckfile(const std::string filename, seq_t seqno,
+                             const unsigned char checksum[SHA_DIGEST_LENGTH]);
     bool idempotentSaveFile(const std::string filename, seq_t seqno);
     bool idempotentDeleteTmp(const std::string filename, seq_t seqno);
     bool idempotentPrepareForFile(const std::string filename, seq_t seqno,
                                   uint32_t nparts);
     bool idempotentStoreFileChunk(const std::string filename, seq_t seqno,
                                   uint32_t partno, uint8_t *data, uint32_t len);
-
-    // tell the filecache what to do
-    // returns:
-    //  zero => drop the packet
-    //  pos  => respond with ack
-    //  neg  => respond with SOS
-    int tell(const Message *msg);
 
    private:
     enum FileStatus { PARTIAL, TMP, VERIFIED, SAVED };
