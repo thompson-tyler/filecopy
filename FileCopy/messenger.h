@@ -3,6 +3,7 @@
 
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 #include "c150dgmsocket.h"
 #include "c150grading.h"
@@ -19,15 +20,15 @@ class Messenger {
     // Sends a message and makes sure it is acknowledged.
     // Returns true if successful, aborts and returns false if SOS (TODO: make
     // sure this is what we want).
-    bool send(std::vector<Message> messages);
+    bool send(const vector<Message> &messages);
 
-    // 1. Creates and sends client Message of PREPARE_FOR_BLOB and waits until
-    // it's acknowledged.
+    // 1. Creates and sends client Message of PREPARE_FOR_BLOB and waits
+    // until it's acknowledged.
     // 2. Then splits blob into sections and sends them, making sure all are
     // acknowledged
     //
-    // Returns true if successful, aborts and returns false if SOS (TODO: make
-    // sure this is what we want).
+    // Returns true if successful, aborts and returns false if SOS
+    // (TODO: make sure this is what we want).
     bool sendBlob(std::string blob, std::string blobName);
 
    private:

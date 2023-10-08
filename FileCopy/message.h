@@ -48,7 +48,7 @@ class Message {
 
     // conversions with packets (preferred over manual)
     Message(Packet *fromPacket);
-    Packet toPacket();
+    Packet toPacket() const;
 
     const MessageType type();
     // all messages coincidentally reference a filename

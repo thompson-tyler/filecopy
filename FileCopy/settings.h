@@ -6,5 +6,6 @@
 
 // Messenger settings
 #define MESSENGER_TIMEOUT 1000
+#define MAX_RESEND_ATTEMPTS 8
 
 #endif

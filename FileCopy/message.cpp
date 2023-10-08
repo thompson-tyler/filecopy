@@ -114,7 +114,7 @@ Message::Message(Packet *fromPacket) {
     }
 }
 
-Packet Message::toPacket() {
+Packet Message::toPacket() const {
     if (m_filename.length() > MAX_FILENAME_SIZE) {
         fprintf(stderr, "Filename %s exceeded MAX_FILENAME_SIZE %u\n",
                 m_filename.c_str(), MAX_FILENAME_SIZE);
