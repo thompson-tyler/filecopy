@@ -1,6 +1,7 @@
 #ifndef MESSAGE_H
 #define MESSAGE_H
 
+#include <cstring>
 #include <iostream>
 
 struct Packet;
@@ -17,9 +18,6 @@ enum MessageType {
     DELETE_IT          = 0b00000100,
     PREPARE_FOR_BLOB   = 0b00001000,
     BLOB_SECTION       = 0b00010000,
-
-    // probably unnecessary, but might be handy to know for debugging
-    SERVER_BIT         = 0b00100000,
 };
 // clang-format on
 
@@ -51,7 +49,7 @@ struct BlobSection {
 // Messages inherit from this virtual class
 class Message {
    public:
-    Message();                    // BEWARE defaults to SOS
+    Message();
     Message(Packet *fromPacket);  // a big switch statement inside here
     ~Message();
 
@@ -71,10 +69,6 @@ class Message {
     /*  Instance constructors e.g.
      * `Message m = Message().ofDeleteIt("myfile");` */
 
-    /* server side */
-    void toggleAck();
-    void toggleSOS();
-
     /* client side */
     void ofCheckIsNecessary(std::string filename);
     void ofKeepIt(std::string filename);
@@ -83,15 +77,23 @@ class Message {
     void ofBlobSection(std::string filename, uint32_t partno, uint32_t size,
                        uint8_t *data);
 
+    /* server side */
+    // modifies an existing message to add an ACK bit or SOS bit
+    void toggleAck();
+    void toggleSOS();
+
    private:
-    MessageType m_type;
-    union {
+    union MessageValue {
         CheckIsNecessary check;
         KeepIt keep;
         DeleteIt del;
         PrepareForBlob prep;
         BlobSection section;
-    } m_value;
+        MessageValue() { memset(this, 0, sizeof(*this)); }
+    };
+
+    MessageType m_type;
+    MessageValue m_value;
 };
 
 #endif

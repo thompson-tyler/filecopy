@@ -41,6 +41,17 @@ bool bufferToFileSecure(NASTYFILE *nfp, string srcfile, uint8_t *buffer,
 uint32_t fileToBuffer(NASTYFILE *nfp, string dir, string filename,
                       uint8_t **buffer_pp, unsigned char checksum[SHA_LEN]) {
     string srcfile = makeFileName(dir, filename);
+    return fileToBuffer(nfp, srcfile, buffer_pp, checksum);
+}
+
+bool bufferToFile(NASTYFILE *nfp, string dir, string filename, uint8_t *buffer,
+                  uint32_t bufferlen) {
+    string srcfile = makeFileName(dir, filename);
+    return bufferToFile(nfp, srcfile, buffer, bufferlen);
+}
+
+uint32_t fileToBuffer(NASTYFILE *nfp, string srcfile, uint8_t **buffer_pp,
+                      unsigned char checksum[SHA_LEN]) {
     if (!isFile(srcfile)) {
         fprintf(stderr, "%s is not a file", srcfile.c_str());
         return -1;
@@ -48,9 +59,8 @@ uint32_t fileToBuffer(NASTYFILE *nfp, string dir, string filename,
     return fileToBufferSecure(nfp, srcfile, buffer_pp, checksum);
 }
 
-bool bufferToFile(NASTYFILE *nfp, string dir, string filename, uint8_t *buffer,
+bool bufferToFile(NASTYFILE *nfp, string srcfile, uint8_t *buffer,
                   uint32_t bufferlen) {
-    string srcfile = makeFileName(dir, filename);
     if (!isFile(srcfile)) {
         fprintf(stderr, "%s is not a file", srcfile.c_str());
         return -1;
@@ -213,7 +223,6 @@ bool isFile(string fname) {
 
 string makeFileName(string dir, string name) {
     stringstream ss;
-
     ss << dir;
     // make sure dir name ends in /
     if (dir.substr(dir.length() - 1, 1) != "/") ss << '/';

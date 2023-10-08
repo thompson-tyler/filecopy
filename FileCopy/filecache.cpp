@@ -3,6 +3,7 @@
 #include "diskio.h"
 
 using namespace C150NETWORK;
+using namespace std;
 
 /*
  *  STATE    | WHEN SEQNO WAS LAST SET
@@ -17,54 +18,48 @@ using namespace C150NETWORK;
 #define ACK true
 #define SOS false
 
-Filecache::Filecache(std::string dir, C150NETWORK::C150NastyFile *nfp) {
+Filecache::Filecache(string dir, C150NastyFile *nfp) {
     m_dir = dir;
     m_nfp = nfp;
 }
 
-Filecache::FileSection::FileSection() {
-    data = nullptr;
-    len = 0;
-}
-
 // no need to be careful about repeatedly calling these
-bool Filecache::idempotentCheckfile(const std::string filename,
+bool Filecache::idempotentCheckfile(const string filename,
                                     unsigned char checksum[SHA_DIGEST_LENGTH],
                                     seq_t seqno) {
     if (!m_cache.count(filename)) return SOS;
     auto &entry = m_cache[filename];
     switch (entry.status) {
-        case FileStatus::PARTIAL:
+        case FileStatus::PARTIAL:  // something is wrong
             return SOS;
         case FileStatus::TMP:
-            // We have already done the check, but it is still in TMP
-            // If it's an old message the client can figure it out
+            // We have already done the check, but it is still in TMP,
+            // Instead, if it's an old message the client can figure it out
             if (seqno <= entry.seqno) return SOS;
+
             // During TMP, seqno is always the most recent check
             entry.seqno = seqno;
-            // Do check
+
+            // Do file check
             uint8_t *buffer;
             uint8_t diskChecksum[SHA_DIGEST_LENGTH];
             fileToBuffer(m_nfp, m_dir, filename, &buffer, diskChecksum);
-            free(buffer);  // ignore the buffer for now
+            free(buffer);  // forget the buffer for now
+
             if (memcmp(diskChecksum, checksum,
-                       SHA_DIGEST_LENGTH))  // failed
+                       SHA_DIGEST_LENGTH))  // check failed
                 return SOS;
-            entry.status = FileStatus::VERIFIED;
+            entry.status = FileStatus::VERIFIED;  // check success
             return ACK;
-        default:  // if verified or saved
+        default:  // if already verified or saved
             return ACK;
     }
 }
 
-bool Filecache::idempotentSaveFile(const std::string filename, seq_t seqno) {
+bool Filecache::idempotentSaveFile(const string filename, seq_t seqno) {
     if (!m_cache.count(filename)) return SOS;
     auto &entry = m_cache[filename];
     switch (entry.status) {
-        case FileStatus::PARTIAL:
-            return SOS;
-        case FileStatus::TMP:
-            return SOS;
         case FileStatus::VERIFIED:
             rename(makeTmpFileName(m_dir, filename).c_str(),
                    makeFileName(m_dir, filename).c_str());
@@ -72,11 +67,13 @@ bool Filecache::idempotentSaveFile(const std::string filename, seq_t seqno) {
             return ACK;
         case FileStatus::SAVED:
             return ACK;
+        default:  // if TMP or PARTIAL, old messages will be ignored by
+            return SOS;
     }
     return ACK;
 }
 
-bool Filecache::idempotentDeleteTmp(const std::string filename, seq_t seqno) {
+bool Filecache::idempotentDeleteTmp(const string filename, seq_t seqno) {
     if (!m_cache.count(filename)) return SOS;
     auto &entry = m_cache[filename];
     switch (entry.status) {
@@ -100,14 +97,17 @@ bool Filecache::idempotentDeleteTmp(const std::string filename, seq_t seqno) {
     return ACK;
 }
 
-bool Filecache::idempotentPrepareForFile(const std::string filename,
-                                         seq_t seqno, uint32_t nparts) {
-    // make a new registry for the file in the cache
-    if (!m_cache.count(filename) ||          // either doesn't exist or
-        (m_cache[filename].seqno < seqno &&  // is partial and a NEW message
-                                             // is telling us to restart
+bool Filecache::idempotentPrepareForFile(const string filename, seq_t seqno,
+                                         uint32_t nparts) {
+    // Make a new empty registry for the file in the cache
+    // The case we want to do this for is that either
+    // 1. It doesn't already exist
+    // OR
+    // 2. The status is PARTIAL and a new message tells us to start over
+    if (!m_cache.count(filename) ||
+        (m_cache[filename].seqno < seqno &&
          m_cache[filename].status == FileStatus::PARTIAL)) {
-        vector<FileSection> sections(nparts);
+        vector<FileSegment> sections(nparts);
         CacheEntry entry = {FileStatus::PARTIAL, seqno, sections};
         m_cache[filename] = entry;
         for (auto &section : m_cache[filename].sections) {
@@ -116,33 +116,52 @@ bool Filecache::idempotentPrepareForFile(const std::string filename,
             section.len = 0;
         }
     }
-
     return ACK;
 }
 
-bool Filecache::idempotentStoreFileChunk(const std::string filename,
-                                         seq_t seqno, uint32_t partno,
-                                         uint8_t *data, uint32_t len) {
+bool Filecache::idempotentStoreFileChunk(const string filename, seq_t seqno,
+                                         uint32_t partno, uint8_t *data,
+                                         uint32_t len) {
     if (!m_cache.count(filename)) {
         return SOS;
     }
 
     auto &entry = m_cache[filename];
-    switch (entry.status) {
-        case FileStatus::PARTIAL:
-            if (entry.seqno < seqno && entry.sections[partno].data == nullptr) {
-                free(entry.sections[partno].data = data);
-                entry.sections[partno].data = data;
-                entry.sections[partno].len = len;
-            }
+    if (entry.status == FileStatus::PARTIAL) {
+        // add fresh section
+        if (entry.seqno < seqno && entry.sections[partno].data == nullptr) {
+            free(entry.sections[partno].data = data);
+            entry.sections[partno].data = data;
+            entry.sections[partno].len = len;
+        }
 
-            // if any sections are still null, we are still partial
-            for (auto &section : entry.sections)
-                if (section.data == nullptr) return ACK;
+        // if any sections are still null, we are still partial
+        for (auto &section : entry.sections)
+            if (section.data == nullptr) return ACK;
 
-            // if we get here, we have all the sections
-            entry.status = FileStatus::TMP;
-        default:
-            return ACK;
+        // if no sections are null, move to TMP
+        entry.status = FileStatus::TMP;
+        uint8_t *buffer = nullptr;
+        uint32_t buflen = joinBuffers(m_cache[filename].sections, &buffer);
+        string tmpfile = makeTmpFileName(m_dir, filename);
+        bufferToFile(m_nfp, tmpfile, buffer, buflen);
+        free(buffer);
     }
+    return ACK;
+}
+
+uint32_t Filecache::joinBuffers(vector<FileSegment> fs, uint8_t **buffer_pp) {
+    uint32_t sumlen = 0;
+    for (auto s : fs) sumlen += s.len;
+
+    uint8_t *buffer = (uint8_t *)malloc(sumlen);
+
+    sumlen = 0;
+    for (auto s : fs) {
+        memcpy(buffer + sumlen, s.data, s.len);
+        sumlen += s.len;
+    }
+
+    *buffer_pp = buffer;
+    return sumlen;
 }

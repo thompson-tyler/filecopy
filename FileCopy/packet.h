@@ -4,11 +4,11 @@
 #include "c150dgmsocket.h"
 #include "message.h"
 
-typedef uint32_t seq_t;
+typedef int seq_t;
 
 struct Header {
-    MessageType type;
-    seq_t seqno;
+    MessageType type = SOS;
+    seq_t seqno = -1;
     // size of data contents
     u_int32_t len = 0;
 };
@@ -20,7 +20,6 @@ struct Packet {
     //
     // interface
     //
-    Packet();                        // zeroed out
     Packet(uint8_t *fromBuffer);     // deserialize
     void toBuffer(uint8_t *buffer);  // serialize
     std::string toString();          // for debugging

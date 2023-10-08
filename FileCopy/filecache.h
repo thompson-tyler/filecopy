@@ -40,18 +40,20 @@ class Filecache {
 
    private:
     enum FileStatus { PARTIAL, TMP, VERIFIED, SAVED };
-    struct FileSection {
-        uint32_t len;
-        uint8_t *data;
-        FileSection();
+    struct FileSegment {
+        uint32_t len = 0;
+        uint8_t *data = nullptr;
     };
 
     struct CacheEntry {
         // ordered by maturity
         FileStatus status;
         seq_t seqno;
-        std::vector<FileSection> sections;
+        std::vector<FileSegment> sections;
     };
+
+    uint32_t joinBuffers(vector<FileSegment> fs, uint8_t **buffer);
+
     /*
      * filename -> ( FileStatus, min seq for redo, [ section1, NULL, ... ])
      */

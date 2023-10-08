@@ -10,9 +10,14 @@
 uint32_t fileToBuffer(C150NETWORK::C150NastyFile *nfp, string dir,
                       string filename, uint8_t **buffer_pp,
                       unsigned char checksum[SHA_DIGEST_LENGTH]);
+uint32_t fileToBuffer(C150NETWORK::C150NastyFile *nfp, string srcfile,
+                      uint8_t **buffer_pp,
+                      unsigned char checksum[SHA_DIGEST_LENGTH]);
 
 bool bufferToFile(C150NETWORK::NASTYFILE *nfp, string dir, string filename,
                   uint8_t *buffer, uint32_t bufferlen);
+bool bufferToFile(C150NETWORK::NASTYFILE *nfp, string srcfile, uint8_t *buffer,
+                  uint32_t bufferlen);
 
 // utils
 void checkDirectory(char *dirname);
