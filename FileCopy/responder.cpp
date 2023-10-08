@@ -7,7 +7,6 @@ using namespace C150NETWORK;
 
 ServerResponder::ServerResponder(Filecache *cache) { m_cache = cache; }
 
-// m
 void ServerResponder::bounce(Packet *p) {
     Message m = Message(p);
     seq_t seqno = p->hdr.seqno;
@@ -57,9 +56,9 @@ void listen(C150DgmSocket *sock, C150NastyFile *nfp, string dir) {
     Packet p;
 
     while (true) {
-        unsigned long len = sock->read((char *)buffer, MAX_PACKET_SIZE);
+        unsigned long len = sock->read((char *)buffer, sizeof(Packet));
         if (len > MAX_PACKET_SIZE || len < sizeof(Packet)) {
-            fprintf(stderr, "read a short packet strange");
+            fprintf(stderr, "read an incorrectly sized packet, strange");
             continue;
         }
         p = Packet(buffer);

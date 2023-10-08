@@ -19,13 +19,23 @@ class Filecache {
    public:
     Filecache(std::string dir, C150NETWORK::C150NastyFile *nfp);
 
-    // no need to be careful about repeatedly calling these
+    // No need to be careful about repeatedly calling these
+
+    // responds SOS if file incomplete, malformed or not yet mentioned
     bool idempotentCheckfile(const std::string filename, seq_t seqno,
                              const unsigned char checksum[SHA_DIGEST_LENGTH]);
+
+    // responds SOS if file incomplete, malformed or not yet mentioned
     bool idempotentSaveFile(const std::string filename, seq_t seqno);
+
+    // responds SOS if file already verified as correct and saved to disk
     bool idempotentDeleteTmp(const std::string filename, seq_t seqno);
+
+    // always ACK
     bool idempotentPrepareForFile(const std::string filename, seq_t seqno,
                                   uint32_t nparts);
+
+    // responds SOS if file is not yet mentioned
     bool idempotentStoreFileChunk(const std::string filename, seq_t seqno,
                                   uint32_t partno, uint8_t *data, uint32_t len);
 

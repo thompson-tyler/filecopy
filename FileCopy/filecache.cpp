@@ -75,7 +75,7 @@ bool Filecache::idempotentSaveFile(const string filename, seq_t seqno) {
             return ACK;
         case FileStatus::SAVED:
             return ACK;
-        default:  // if TMP or PARTIAL, old messages will be ignored by
+        default:  // if TMP or PARTIAL, old messages will be ignored by client
             return SOS;
     }
     return ACK;
@@ -111,11 +111,12 @@ bool Filecache::idempotentPrepareForFile(const string filename, seq_t seqno,
     // The case we want to do this for is that either
     // 1. It doesn't already exist
     // OR
-    // 2. The status is PARTIAL and a new message tells us to start over
+    // 2. The status is PARTIAL and a **NEW** message tells us to start over
     if (!m_cache.count(filename) ||
         (m_cache[filename].seqno < seqno &&
          m_cache[filename].status == FileStatus::PARTIAL)) {
         vector<FileSegment> sections(nparts);
+        // set current seqno
         CacheEntry entry = {FileStatus::PARTIAL, seqno, sections};
         m_cache[filename] = entry;
         for (auto &section : m_cache[filename].sections) {
@@ -136,7 +137,8 @@ bool Filecache::idempotentStoreFileChunk(const string filename, seq_t seqno,
 
     auto &entry = m_cache[filename];
     if (entry.status == FileStatus::PARTIAL) {
-        // add fresh section
+        // add fresh section, if seqno is more recent than when file was first
+        // announced
         if (entry.seqno < seqno && entry.sections[partno].data == nullptr) {
             free(entry.sections[partno].data = data);
             entry.sections[partno].data = data;
