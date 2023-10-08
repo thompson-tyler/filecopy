@@ -1,13 +1,15 @@
 #ifndef MESSAGE_H
 #define MESSAGE_H
 
-#include "packet.h"
+#include <iostream>
+
+struct Packet;
 
 // All message types, doesn't discriminate on origin of client vs server
 // clang-format off
 enum MessageType {
-    SOS                = -1,         // check via `packet.header.type == SOS`
-    ACK                = 0b10000000, // check via `packet.header.type & ACK`
+    SOS                = -1,         // check via `packet.header.type < 0`
+    ACK                = 0b01000000, // check via `packet.header.type & ACK`
                                      
     // these don't have to be bit flags, but why not
     CHECK_IS_NECESSARY = 0b00000001, 
@@ -17,7 +19,7 @@ enum MessageType {
     BLOB_SECTION       = 0b00010000,
 
     // probably unnecessary, but might be handy to know for debugging
-    SERVER_BIT         = 0b01000000,
+    SERVER_BIT         = 0b00100000,
 };
 // clang-format on
 
@@ -66,12 +68,12 @@ class Message {
 
     std::string toString();  // for debug
 
-    // constructors e.g.
-    // `Message m = Message().ofDeleteIt("myfile");`
+    /*  Instance constructors e.g.
+     * `Message m = Message().ofDeleteIt("myfile");` */
 
     /* server side */
-    void ofAck();
-    void ofSOS();
+    void toggleAck();
+    void toggleSOS();
 
     /* client side */
     void ofCheckIsNecessary(std::string filename);

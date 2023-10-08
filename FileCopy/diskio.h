@@ -18,5 +18,6 @@ bool bufferToFile(C150NETWORK::NASTYFILE *nfp, string dir, string filename,
 void checkDirectory(char *dirname);
 bool isFile(string fname);
 string makeFileName(string dir, string name);
+string makeTmpFileName(string dir, string name);
 
 #endif

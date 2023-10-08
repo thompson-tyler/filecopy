@@ -1,10 +1,8 @@
 #ifndef PACKET_H
 #define PACKET_H
 
-#include <openssl/sha.h>
-
 #include "c150dgmsocket.h"
-#include "messenger.h"
+#include "message.h"
 
 typedef uint32_t seq_t;
 

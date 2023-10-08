@@ -139,7 +139,7 @@ bool bufferToFileSecure(NASTYFILE *nfp, string srcfile, uint8_t *buffer,
 
         // read back from the disk
         uint8_t *diskbuf = nullptr;
-        uint8_t dlen = fileToBufferSecure(nfp, srcfile, &diskbuf, diskChecksum);
+        fileToBufferSecure(nfp, srcfile, &diskbuf, diskChecksum);
         free(diskbuf);
         if (memcmp(bufferChecksum, diskChecksum, SHA_LEN) == 0) {
             return true;
@@ -155,7 +155,12 @@ bool bufferToFileSecure(NASTYFILE *nfp, string srcfile, uint8_t *buffer,
 bool bufferToFileNaive(NASTYFILE *nfp, string srcfile, uint8_t *buffer,
                        uint32_t bufferlen) {
     void *fopenretval = nfp->fopen(srcfile.c_str(), "wb");
-    int len = nfp->fwrite(buffer, 1, bufferlen);
+    if (fopenretval == NULL) {
+        cerr << "Error opening input file " << srcfile << endl;
+        exit(12);
+    }
+
+    uint32_t len = nfp->fwrite(buffer, 1, bufferlen);
     if (len != bufferlen) {
         cerr << "Error writing file " << srcfile << endl;
         exit(16);
@@ -165,6 +170,8 @@ bool bufferToFileNaive(NASTYFILE *nfp, string srcfile, uint8_t *buffer,
         cerr << "Error closing output file " << srcfile << endl;
         exit(16);
     }
+
+    return true;
 }
 
 //
@@ -212,4 +219,8 @@ string makeFileName(string dir, string name) {
     if (dir.substr(dir.length() - 1, 1) != "/") ss << '/';
     ss << name;       // append file name to dir
     return ss.str();  // return dir/name
+}
+
+string makeTmpFileName(string dir, string name) {
+    return makeFileName(dir, name + ".tmp");
 }

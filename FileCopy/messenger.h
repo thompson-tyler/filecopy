@@ -1,8 +1,6 @@
 #ifndef MESSENGER_H
 #define MESSENGER_H
 
-#include <openssl/sha.h>
-
 #include <string>
 #include <unordered_map>
 

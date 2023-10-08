@@ -32,7 +32,7 @@
 
 # Do all C++ compies with g++
 CPP = g++
-CPPFLAGS = -g -Wall -Werror -I$(C150LIB)
+CPPFLAGS = -g -Wall -Werror -I$(C150LIB) 
 
 # Where the COMP 150 shared utilities live, including c150ids.a and userports.csv
 # Note that environment variable COMP117 must be set for this to work!
@@ -43,7 +43,7 @@ C150AR = $(C150LIB)c150ids.a
 LDFLAGS = 
 INCLUDES = $(C150LIB)c150dgmsocket.h $(C150LIB)c150nastydgmsocket.h $(C150LIB)c150network.h $(C150LIB)c150exceptions.h $(C150LIB)c150debug.h $(C150LIB)c150utility.h messenger.h
 
-OBJ = filecache.o messenger.o responder.o packet.o manager.o message.o
+OBJ = filecache.o messenger.o responder.o packet.o manager.o message.o diskio.o
 
 all: nastyfiletest makedatafile sha1test
 
@@ -74,7 +74,7 @@ makedatafile: makedatafile.cpp
 #
 # To get any .o, compile the corresponding .cpp
 #
-%.o: %.cpp  $(INCLUDES)
+%.o: %.cpp $(INCLUDES)
 	$(CPP) -c $(CPPFLAGS) $< -o $@ 
 
 #
