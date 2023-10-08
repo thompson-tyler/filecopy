@@ -21,7 +21,7 @@ class Filecache {
 
     // No need to be careful about repeatedly calling these
 
-    // responds SOS if file incomplete, malformed or not yet mentioned
+    // responds SOS if file incomplete, malformed
     bool idempotentCheckfile(const std::string filename, seq_t seqno,
                              const unsigned char checksum[SHA_DIGEST_LENGTH]);
 

@@ -23,7 +23,9 @@
 using namespace std;
 using namespace C150NETWORK;
 
-// TODO: make fileread return -1 if file doesn't exist
+/*
+ * HELPER FUNCTIONS
+ */
 
 // what we'd do if there was no nastiness
 int fileToBufferNaive(NASTYFILE *nfp, string srcfile, uint8_t **buffer_pp);
@@ -36,6 +38,10 @@ int fileToBufferSecure(NASTYFILE *nfp, string srcfile, uint8_t **buffer_pp,
 // these have an end to end check
 bool bufferToFileSecure(NASTYFILE *nfp, string srcfile, uint8_t *buffer,
                         uint32_t bufferlen);
+
+/*
+ * Overloading wrappers
+ */
 
 // returns -1 in disk error
 // guarantees that file read off disk is correct by trying repeatedly and
@@ -52,6 +58,10 @@ bool bufferToFile(NASTYFILE *nfp, string dir, string filename, uint8_t *buffer,
     return bufferToFile(nfp, srcfile, buffer, bufferlen);
 }
 
+/*
+ *
+ */
+
 int fileToBuffer(NASTYFILE *nfp, string srcfile, uint8_t **buffer_pp,
                  unsigned char checksum[SHA_LEN]) {
     if (!isFile(srcfile)) {
@@ -67,12 +77,11 @@ bool bufferToFile(NASTYFILE *nfp, string srcfile, uint8_t *buffer,
         fprintf(stderr, "%s is not a file", srcfile.c_str());
         return -1;
     }
-
     return bufferToFileSecure(nfp, srcfile, buffer, bufferlen);
 }
 
 // Brute force secure read
-// needs to have 2 flawless of n reads
+// needs to have 2 flawless of MAX_DISK_RETRIES reads
 int fileToBufferSecure(NASTYFILE *nfp, string srcfile, uint8_t **buffer_pp,
                        unsigned char checksumOut[SHA_LEN]) {
     unsigned char checksums[MAX_DISK_RETRIES][SHA_LEN];
@@ -99,15 +108,13 @@ int fileToBufferSecure(NASTYFILE *nfp, string srcfile, uint8_t **buffer_pp,
     return -1;
 }
 
+// Read whole input file (mostly taken from Noah's samples)
 int fileToBufferNaive(NASTYFILE *nfp, string srcfile, uint8_t **buffer_pp) {
     if (*buffer_pp != nullptr) {
         fprintf(stderr, "CANNOT pass fileToBuffer reference to non-null ptr\n");
         exit(EXIT_FAILURE);
     }
 
-    //
-    // Read whole input file
-    //
     struct stat statbuf;
     if (lstat(srcfile.c_str(), &statbuf) != 0) {
         fprintf(stderr, "copyFile: Error stating supplied source file %s\n",

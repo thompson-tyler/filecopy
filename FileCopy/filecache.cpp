@@ -40,7 +40,13 @@ bool Filecache::filecheck(string filename, checksum_t checksum) {
 bool Filecache::idempotentCheckfile(const string filename, seq_t seqno,
                                     checksum_t checksum) {
     if (!m_cache.count(filename)) {
-        return filecheck(makeFileName(m_dir, filename), checksum);
+        // cache filename if success
+        if (filecheck(makeFileName(m_dir, filename), checksum)) {
+            m_cache[filename].seqno = seqno;
+            m_cache[filename].status = FileStatus::SAVED;
+            return ACK;
+        }
+        return SOS;
     }
 
     auto &entry = m_cache[filename];
