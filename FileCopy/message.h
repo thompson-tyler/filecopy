@@ -6,6 +6,8 @@
 #include <cstring>
 #include <iostream>
 
+#include "settings.h"
+
 struct Packet;
 
 // All message types, doesn't discriminate on origin of client vs server
@@ -27,6 +29,7 @@ enum MessageType {
 // clang-format on
 
 struct CheckIsNecessary {
+    char filename[MAX_FILENAME_LENGTH];
     unsigned char checksum[SHA_DIGEST_LENGTH];
 };
 
@@ -53,7 +56,7 @@ class Message {
     const MessageType type();
     // all messages coincidentally reference a filename
     // so drew this out, could instead have been a uuid but whatever
-    const std::string filename();
+    const int id();
 
     // returns nullptr if invalid access
     const CheckIsNecessary *getCheckIsNecessary();
@@ -66,12 +69,12 @@ class Message {
      * `Message m = Message().ofDeleteIt("myfile");` */
 
     /* client side */
-    Message ofCheckIsNecessary(std::string filename,
+    Message ofCheckIsNecessary(int id, char filename[MAX_FILENAME_LENGTH],
                                unsigned char checksum[SHA_DIGEST_LENGTH]);
-    Message ofKeepIt(std::string filename);
-    Message ofDeleteIt(std::string filename);
-    Message ofPrepareForBlob(std::string filename, uint32_t nparts);
-    Message ofBlobSection(std::string filename, uint32_t partno, uint32_t size,
+    Message ofKeepIt(int id);
+    Message ofDeleteIt(int id);
+    Message ofPrepareForBlob(int id, uint32_t nparts);
+    Message ofBlobSection(int id, uint32_t partno, uint32_t size,
                           const uint8_t *data);
 
     /* server side */
@@ -87,7 +90,7 @@ class Message {
         ~MessageValue();
     };
 
-    std::string m_filename;
+    int m_id;
     MessageType m_type;
     MessageValue m_value;
 };
