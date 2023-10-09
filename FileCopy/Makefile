@@ -80,7 +80,7 @@ makedatafile: makedatafile.cpp
 #
 #
 #
-lib: filecache.o diskio.o messenger.o message.o packet.o responder.o
+lib: filecache.o diskio.o messenger.o message.o packet.o responder.o clientmanager.o
 
 #
 # Delete all compiled code in preparation

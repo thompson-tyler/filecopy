@@ -31,8 +31,10 @@ ClientManager::ClientManager(C150NastyFile *nfp, string dir) {
 }
 
 bool sendFiles(Messenger *m) {
+    // TODO
     assert(m);
     (void)m;
+    return true;
 }
 
 ClientManager::FileTracker::FileTracker() {
