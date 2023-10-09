@@ -10,9 +10,11 @@ ServerResponder::ServerResponder(Filecache *cache) { m_cache = cache; }
 void ServerResponder::bounce(Packet *p) {
     Message m = Message(p);
     seq_t seqno = p->hdr.seqno;
+    const CheckIsNecessary *check;
+    const PrepareForBlob *prep;
+    const BlobSection *section;
 
-    // defaults always to SOS
-    bool shouldAck = false;
+    bool shouldAck = false;  // defaults always to SOS
 
     switch (m.type()) {
         case SOS:
@@ -22,23 +24,24 @@ void ServerResponder::bounce(Packet *p) {
             shouldAck = true;
             break;
         case KEEP_IT:
-            shouldAck = m_cache->idempotentSaveFile(m.filename(), seqno);
+            shouldAck = m_cache->idempotentSaveFile(m.id(), seqno);
             break;
         case DELETE_IT:
-            shouldAck = m_cache->idempotentDeleteTmp(m.filename(), seqno);
+            shouldAck = m_cache->idempotentDeleteTmp(m.id(), seqno);
             break;
         case CHECK_IS_NECESSARY:
+            check = m.getCheckIsNecessary();
             shouldAck = m_cache->idempotentCheckfile(
-                m.filename(), seqno, m.getCheckIsNecessary()->checksum);
+                m.id(), seqno, check->filename, check->checksum);
             break;
         case PREPARE_FOR_BLOB:
+            prep = m.getPrepareForBlob();
             shouldAck = m_cache->idempotentPrepareForFile(
-                m.filename(), seqno, m.getPrepareForBlob()->nparts);
+                m.id(), seqno, prep->filename, prep->nparts);
         case BLOB_SECTION:
-            const BlobSection *section = m.getBlobSection();
+            section = m.getBlobSection();
             shouldAck = m_cache->idempotentStoreFileChunk(
-                m.filename(), seqno, section->partno, section->data,
-                section->len);
+                m.id(), seqno, section->partno, section->data, section->len);
             break;
     }
 

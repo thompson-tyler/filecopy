@@ -29,13 +29,14 @@ enum MessageType {
 // clang-format on
 
 struct CheckIsNecessary {
-    char filename[MAX_FILENAME_LENGTH];
     unsigned char checksum[SHA_DIGEST_LENGTH];
+    char filename[MAX_FILENAME_LENGTH];
 };
 
 // Possible kinds of message values
 struct PrepareForBlob {
     uint32_t nparts;
+    char filename[MAX_FILENAME_LENGTH];
 };
 
 struct BlobSection {
@@ -69,11 +70,11 @@ class Message {
      * `Message m = Message().ofDeleteIt("myfile");` */
 
     /* client side */
-    Message ofCheckIsNecessary(int id, char filename[MAX_FILENAME_LENGTH],
+    Message ofCheckIsNecessary(int id, std::string filename,
                                unsigned char checksum[SHA_DIGEST_LENGTH]);
     Message ofKeepIt(int id);
     Message ofDeleteIt(int id);
-    Message ofPrepareForBlob(int id, uint32_t nparts);
+    Message ofPrepareForBlob(int id, std::string filename, uint32_t nparts);
     Message ofBlobSection(int id, uint32_t partno, uint32_t size,
                           const uint8_t *data);
 

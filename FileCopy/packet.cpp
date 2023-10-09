@@ -12,9 +12,8 @@ Packet::Packet() {
     memset(data, 0, sizeof(data));
 }
 
-// TODO: add variable length reads !!!
 Packet::Packet(uint8_t *fromBuffer) {
-    Packet *p = (Packet *)(fromBuffer);
+    Packet *p = (Packet *)fromBuffer;
     hdr = p->hdr;
     memcpy(data, p->data, p->hdr.len);
 }

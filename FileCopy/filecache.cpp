@@ -37,19 +37,20 @@ bool Filecache::filecheck(string filename, checksum_t checksum) {
 }
 
 // no need to be careful about repeatedly calling these
-bool Filecache::idempotentCheckfile(const string filename, seq_t seqno,
+bool Filecache::idempotentCheckfile(int id, seq_t seqno, const string filename,
                                     checksum_t checksum) {
-    if (!m_cache.count(filename)) {
+    if (!m_cache.count(id)) {
         // cache filename if success
         if (filecheck(makeFileName(m_dir, filename), checksum)) {
-            m_cache[filename].seqno = seqno;
-            m_cache[filename].status = FileStatus::SAVED;
+            m_idmap[id] = filename;
+            m_cache[id].seqno = seqno;
+            m_cache[id].status = FileStatus::SAVED;
             return ACK;
         }
         return SOS;
     }
 
-    auto &entry = m_cache[filename];
+    auto &entry = m_cache[id];
     switch (entry.status) {
         case FileStatus::PARTIAL:  // something is wrong
             return SOS;
@@ -70,13 +71,13 @@ bool Filecache::idempotentCheckfile(const string filename, seq_t seqno,
     }
 }
 
-bool Filecache::idempotentSaveFile(const string filename, seq_t seqno) {
-    if (!m_cache.count(filename)) return SOS;
-    auto &entry = m_cache[filename];
+bool Filecache::idempotentSaveFile(int id, seq_t seqno) {
+    if (!m_cache.count(id)) return SOS;
+    auto &entry = m_cache[id];
     switch (entry.status) {
         case FileStatus::VERIFIED:
-            rename(makeTmpFileName(m_dir, filename).c_str(),
-                   makeFileName(m_dir, filename).c_str());
+            rename(makeTmpFileName(m_dir, m_idmap[id]).c_str(),
+                   makeFileName(m_dir, m_idmap[id]).c_str());
             entry.status = FileStatus::SAVED;
             return ACK;
         case FileStatus::SAVED:
@@ -87,14 +88,14 @@ bool Filecache::idempotentSaveFile(const string filename, seq_t seqno) {
     return ACK;
 }
 
-bool Filecache::idempotentDeleteTmp(const string filename, seq_t seqno) {
-    if (!m_cache.count(filename)) return SOS;
-    auto &entry = m_cache[filename];
+bool Filecache::idempotentDeleteTmp(int id, seq_t seqno) {
+    if (!m_cache.count(id)) return SOS;
+    auto &entry = m_cache[id];
     switch (entry.status) {
         case FileStatus::PARTIAL:
             return ACK;
         case FileStatus::TMP:
-            remove(makeTmpFileName(m_dir, filename).c_str());
+            remove(makeTmpFileName(m_dir, m_idmap[id]).c_str());
             entry.seqno = seqno;
             for (auto &section : entry.sections) {
                 free(section.data);
@@ -111,21 +112,22 @@ bool Filecache::idempotentDeleteTmp(const string filename, seq_t seqno) {
     return ACK;
 }
 
-bool Filecache::idempotentPrepareForFile(const string filename, seq_t seqno,
+bool Filecache::idempotentPrepareForFile(int id, seq_t seqno,
+                                         const string filename,
                                          uint32_t nparts) {
     // Make a new empty registry for the file in the cache
     // The case we want to do this for is that either
     // 1. It doesn't already exist
     // OR
     // 2. The status is PARTIAL and a **NEW** message tells us to start over
-    if (!m_cache.count(filename) ||
-        (m_cache[filename].seqno < seqno &&
-         m_cache[filename].status == FileStatus::PARTIAL)) {
+    if (!m_cache.count(id) || (m_cache[id].seqno < seqno &&
+                               m_cache[id].status == FileStatus::PARTIAL)) {
         vector<FileSegment> sections(nparts);
         // set current seqno
         CacheEntry entry = {FileStatus::PARTIAL, seqno, sections};
-        m_cache[filename] = entry;
-        for (auto &section : m_cache[filename].sections) {
+        m_cache[id] = entry;
+        m_idmap[id] = filename;
+        for (auto &section : m_cache[id].sections) {
             free(section.data);
             section.data = nullptr;
             section.len = 0;
@@ -134,14 +136,13 @@ bool Filecache::idempotentPrepareForFile(const string filename, seq_t seqno,
     return ACK;
 }
 
-bool Filecache::idempotentStoreFileChunk(const string filename, seq_t seqno,
-                                         uint32_t partno, uint8_t *data,
-                                         uint32_t len) {
-    if (!m_cache.count(filename)) {
+bool Filecache::idempotentStoreFileChunk(int id, seq_t seqno, uint32_t partno,
+                                         uint8_t *data, uint32_t len) {
+    if (!m_cache.count(id)) {
         return SOS;
     }
 
-    auto &entry = m_cache[filename];
+    auto &entry = m_cache[id];
     if (entry.status == FileStatus::PARTIAL) {
         // add fresh section, if seqno is more recent than when file was first
         // announced
@@ -158,8 +159,8 @@ bool Filecache::idempotentStoreFileChunk(const string filename, seq_t seqno,
         // if no sections are null, move to TMP
         entry.status = FileStatus::TMP;
         uint8_t *buffer = nullptr;
-        uint32_t buflen = joinBuffers(m_cache[filename].sections, &buffer);
-        string tmpfile = makeTmpFileName(m_dir, filename);
+        uint32_t buflen = joinBuffers(m_cache[id].sections, &buffer);
+        string tmpfile = makeTmpFileName(m_dir, m_idmap[id]);
         bufferToFile(m_nfp, tmpfile, buffer, buflen);
         free(buffer);
     }

@@ -18,11 +18,12 @@ Message::~Message() {
 const MessageType Message::type() { return m_type; }
 const int Message::id() { return m_id; }
 
-Message Message::ofCheckIsNecessary(int id, char filename[MAX_FILENAME_LENGTH],
+Message Message::ofCheckIsNecessary(int id, string filename,
                                     unsigned char checksum[SHA_DIGEST_LENGTH]) {
     m_type = CHECK_IS_NECESSARY;
     m_id = id;
-    memcpy(m_value.check.filename, filename, MAX_FILENAME_LENGTH);
+    memset(m_value.check.filename, 0, MAX_FILENAME_LENGTH);
+    memcpy(m_value.check.filename, filename.c_str(), filename.length());
     memcpy(m_value.check.checksum, checksum, SHA_DIGEST_LENGTH);
     return *this;
 }
@@ -39,10 +40,13 @@ Message Message::ofDeleteIt(int id) {
     return *this;
 }
 
-Message Message::ofPrepareForBlob(int id, uint32_t nparts) {
+Message Message::ofPrepareForBlob(int id, std::string filename,
+                                  uint32_t nparts) {
     m_type = PREPARE_FOR_BLOB;
     m_id = id;
     m_value.prep.nparts = nparts;
+    memset(m_value.prep.filename, 0, MAX_FILENAME_LENGTH);
+    memcpy(m_value.prep.filename, filename.c_str(), filename.length());
     return *this;
 }
 
@@ -72,12 +76,12 @@ const CheckIsNecessary *Message::getCheckIsNecessary() {
 }
 
 const PrepareForBlob *Message::getPrepareForBlob() {
-    if (m_type != CHECK_IS_NECESSARY) return nullptr;
+    if (m_type != PREPARE_FOR_BLOB) return nullptr;
     return &m_value.prep;
 }
 
 const BlobSection *Message::getBlobSection() {
-    if (m_type != CHECK_IS_NECESSARY) return nullptr;
+    if (m_type != BLOB_SECTION) return nullptr;
     return &m_value.section;
 }
 
@@ -86,9 +90,9 @@ const BlobSection *Message::getBlobSection() {
 //  *fromPacket->data    *data
 //                |        |
 //                V        V
-//       PREPARE  [ i32 id | u32 partno | u8[len] data            ]
-//       CHECK    [ i32 id | u8[FILE] filename | u8[SHA] checksum ]
-//       SECTION  [ i32 id | u32 nparts | ...                     ]
+//       PREPARE  [ i32 id | u32 partno       | u8[len] data      ]
+//       CHECK    [ i32 id | u8[SHA] checksum | u8[FILE] filename ]
+//       SECTION  [ i32 id | u32 nparts       | u8[FILE] filename ]
 //
 
 Message::Message(Packet *fromPacket) {
@@ -169,11 +173,12 @@ string Message::toString() {
             ss << "Filename:\n";
             ss << m_value.check.filename << endl;
             ss << "Checksum:\n";
-            for (int i = 0; i < SHA_DIGEST_LENGTH; i++) {
+            for (int i = 0; i < SHA_DIGEST_LENGTH; i++)
                 ss << hex << m_value.check.checksum[i];
-            }
             ss << endl;
         case PREPARE_FOR_BLOB:
+            ss << "Filename:\n";
+            ss << m_value.prep.filename << endl;
             ss << "Number of sections:\n";
             ss << m_value.prep.nparts << endl;
         case BLOB_SECTION:
@@ -182,9 +187,8 @@ string Message::toString() {
             ss << "Section len:\n";
             ss << m_value.section.len << endl;
             ss << "Data:\n";
-            for (uint32_t i = 0; i < m_value.section.len; i++) {
+            for (uint32_t i = 0; i < m_value.section.len; i++)
                 ss << m_value.section.data[i];
-            }
             ss << endl;
             break;
     }
