@@ -23,25 +23,32 @@
 using namespace C150NETWORK;
 using namespace std;
 
-ClientManager::ClientManager(C150NastyFile *nfp, string dir) {
+ClientManager::ClientManager(C150NastyFile *nfp, vector<string> *files) {
     assert(nfp);
     m_nfp = nfp;
-    m_dir = dir;
     // TODO: load all files from directory into m_filemap
 }
 
-bool sendFiles(Messenger *m) {
+bool ClientManager::sendFiles(Messenger *m) {
     // TODO
     assert(m);
     (void)m;
     return true;
 }
 
-ClientManager::FileTracker::FileTracker() {
-    buffer = nullptr;
-    filelen = -1;
-    id = -1;
-    SOScount = 0;
+bool ClientManager::endToEndCheck(Messenger *m) {
+    // TODO
+    assert(m);
+    (void)m;
+    return true;
 }
 
-ClientManager::FileTracker::~FileTracker() { free(buffer); }
+ClientManager::FileTracker::FileTracker(string filename) {
+    filedata = nullptr;
+    filelen = -1;
+    filename = filename;
+    SOScount = 0;
+    status = LOCALONLY;
+}
+
+ClientManager::FileTracker::~FileTracker() { free(filedata); }
