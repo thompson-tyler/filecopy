@@ -78,6 +78,11 @@ makedatafile: makedatafile.cpp
 	$(CPP) -c $(CPPFLAGS) $< -o $@ 
 
 #
+#
+#
+lib: filecache.o diskio.o messenger.o message.o packet.o responder.o
+
+#
 # Delete all compiled code in preparation
 # for forcing complete rebuild#
 

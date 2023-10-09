@@ -48,7 +48,6 @@ class Filecache {
         uint32_t len = 0;
         uint8_t *data = nullptr;
     };
-
     struct CacheEntry {
         // ordered by maturity
         FileStatus status;

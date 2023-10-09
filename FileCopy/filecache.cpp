@@ -6,18 +6,21 @@ using namespace C150NETWORK;
 using namespace std;
 
 /*
- *  STATE    | WHEN SEQNO WAS LAST SET
- *  -----------------------------------------------------
- *  PARTIAL  | first received prepareForFile since PARTIAL
- *  TMP      | all sections were completed
- *             -then-> the when the last attempt to verify the file was
+ *  STATUS   | SEQNO WAS LAST SET WHEN
+ *  -------------------------------------------------------------------
+ *  PARTIAL  | received a prepareForFile since last NON-PARTIAL
+ *  TMP      | final section was received
+ *           OR
+ *           | last attempted to verify the file
  *  VERIFIED | when the file was first correctly verified
  *  SAVED    | when the file was first saved
+ *
  * */
 
 #define ACK true
 #define SOS false
 
+// small readability adjustment
 typedef const unsigned char checksum_t[SHA_DIGEST_LENGTH];
 
 Filecache::Filecache(string dir, C150NastyFile *nfp) {
@@ -25,28 +28,39 @@ Filecache::Filecache(string dir, C150NastyFile *nfp) {
     m_nfp = nfp;
 }
 
+// returns true if file is good
 bool Filecache::filecheck(string filename, checksum_t checksum) {
     uint8_t *buffer;
     uint8_t diskChecksum[SHA_DIGEST_LENGTH];
+
+    // fileToBuffer guarantees no nastyfile issues
     int len = fileToBuffer(m_nfp, filename, &buffer, diskChecksum);
 
-    if (len == -1) return SOS;
+    if (len == -1) return SOS;  // file doesn't exist
 
-    free(buffer);  // forget the buffer for now
+    free(buffer);
     return (memcmp(diskChecksum, checksum, SHA_DIGEST_LENGTH)) ? SOS : ACK;
 }
 
 // no need to be careful about repeatedly calling these
 bool Filecache::idempotentCheckfile(int id, seq_t seqno, const string filename,
                                     checksum_t checksum) {
+    // If we haven't heard of this ID, try to perform the check on the filename
+    // anyway. This is kind of a hack that lets us verify pre-existing files.
     if (!m_cache.count(id)) {
-        // cache filename if success
+        // cache if success (note we check the actual file not .tmp)
         if (filecheck(makeFileName(m_dir, filename), checksum)) {
             m_idmap[id] = filename;
             m_cache[id].seqno = seqno;
             m_cache[id].status = FileStatus::SAVED;
             return ACK;
         }
+        // move to tmp file
+        m_idmap[id] = filename;
+        m_cache[id].seqno = seqno;
+        m_cache[id].status = FileStatus::TMP;
+        rename(makeFileName(m_dir, filename).c_str(),
+               makeTmpFileName(m_dir, filename).c_str());
         return SOS;
     }
 
@@ -59,9 +73,11 @@ bool Filecache::idempotentCheckfile(int id, seq_t seqno, const string filename,
             // Instead, if it's an old message the client can figure it out
             if (seqno <= entry.seqno) return SOS;
 
-            // During TMP, seqno is always the most recent check
+            // During TMP, seqno is always the most recent filecheck, or when
+            // file was finished
             entry.seqno = seqno;
 
+            // check the .tmp file
             if (!filecheck(makeTmpFileName(m_dir, filename), checksum))
                 return SOS;
             entry.status = FileStatus::VERIFIED;  // check success
@@ -89,7 +105,9 @@ bool Filecache::idempotentSaveFile(int id, seq_t seqno) {
 }
 
 bool Filecache::idempotentDeleteTmp(int id, seq_t seqno) {
+    // TODO: this should try to delete the file
     if (!m_cache.count(id)) return SOS;
+
     auto &entry = m_cache[id];
     switch (entry.status) {
         case FileStatus::PARTIAL:

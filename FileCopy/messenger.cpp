@@ -71,22 +71,22 @@ bool Messenger::send(const vector<Message> &messages) {
     throw C150NetworkException("Network failure");
 }
 
-bool Messenger::sendBlob(string blob, string blobName) {
-    vector<Message> sectionMessages = partitionBlob(blob, blobName);
+bool Messenger::sendBlob(string blob, int blobid, string blobName) {
+    vector<Message> sectionMessages = partitionBlob(blob, blobid);
     vector<Message> prepMessage;
     prepMessage.push_back(
-        Message().ofPrepareForBlob(blobName, sectionMessages.size()));
+        Message().ofPrepareForBlob(blobid, blobName, sectionMessages.size()));
     return (send(prepMessage) && send(sectionMessages));
 }
 
-vector<Message> Messenger::partitionBlob(string blob, string blobName) {
+vector<Message> Messenger::partitionBlob(string blob, int blobid) {
     vector<Message> messages;
     size_t pos = 0;
     uint32_t partno = 0;
     while (pos < blob.size()) {
         string data_string = blob.substr(pos, MAX_DATA_SIZE);
         auto data = (uint8_t *)data_string.c_str();
-        Message m = Message().ofBlobSection(blobName, partno++,
+        Message m = Message().ofBlobSection(blobid, partno++,
                                             data_string.length(), data);
         messages.push_back(m);
     }

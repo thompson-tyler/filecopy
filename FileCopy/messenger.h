@@ -29,10 +29,10 @@ class Messenger {
     //
     // Returns true if successful, aborts and returns false if SOS
     // (TODO: make sure this is what we want).
-    bool sendBlob(std::string blob, std::string blobName);
+    bool sendBlob(std::string blob, int blobid, std::string blobName);
 
    private:
-    std::vector<Message> partitionBlob(std::string blob, std::string blobName);
+    std::vector<Message> partitionBlob(string blob, int blobid);
 
     std::string read();
 

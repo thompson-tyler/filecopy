@@ -11,6 +11,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include <cassert>
 #include <cstdio>
 #include <cstring>
 #include <iostream>
@@ -110,13 +111,10 @@ int fileToBufferSecure(NASTYFILE *nfp, string srcfile, uint8_t **buffer_pp,
 
 // Read whole input file (mostly taken from Noah's samples)
 int fileToBufferNaive(NASTYFILE *nfp, string srcfile, uint8_t **buffer_pp) {
-    if (*buffer_pp != nullptr) {
-        fprintf(stderr, "CANNOT pass fileToBuffer reference to non-null ptr\n");
-        exit(EXIT_FAILURE);
-    }
+    assert(buffer_pp == nullptr);
 
     struct stat statbuf;
-    if (lstat(srcfile.c_str(), &statbuf) != 0) {
+    if (lstat(srcfile.c_str(), &statbuf) != 0) {  // maybe file doesn't exist
         fprintf(stderr, "copyFile: Error stating supplied source file %s\n",
                 srcfile.c_str());
         return -1;
@@ -124,24 +122,22 @@ int fileToBufferNaive(NASTYFILE *nfp, string srcfile, uint8_t **buffer_pp) {
 
     uint8_t *buffer = (uint8_t *)malloc(statbuf.st_size);
 
+    // so file does exist -- but something else is wrong, just kill process
     void *fopenretval = nfp->fopen(srcfile.c_str(), "rb");
     if (fopenretval == NULL) {
         cerr << "Error opening input file " << srcfile << endl;
-        free(buffer);
-        return -1;
+        exit(EXIT_FAILURE);
     }
 
     uint32_t len = nfp->fread(buffer, 1, statbuf.st_size);
     if (len != statbuf.st_size) {
         cerr << "Error reading input file " << srcfile << endl;
-        free(buffer);
-        return -1;
+        exit(EXIT_FAILURE);
     }
 
     if (nfp->fclose() != 0) {
         cerr << "Error closing input file " << srcfile << endl;
-        free(buffer);
-        return -1;
+        exit(EXIT_FAILURE);
     }
 
     *buffer_pp = buffer;
@@ -164,9 +160,7 @@ bool bufferToFileSecure(NASTYFILE *nfp, string srcfile, uint8_t *buffer,
         uint8_t *diskbuf = nullptr;
         fileToBufferSecure(nfp, srcfile, &diskbuf, diskChecksum);
         free(diskbuf);
-        if (memcmp(bufferChecksum, diskChecksum, SHA_LEN) == 0) {
-            return true;
-        }
+        if (memcmp(bufferChecksum, diskChecksum, SHA_LEN) == 0) return true;
     }
 
     fprintf(stderr,
