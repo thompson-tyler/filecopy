@@ -1,5 +1,6 @@
 #include "messenger.h"
 
+#include <cassert>
 #include <unordered_map>
 #include <vector>
 
@@ -20,25 +21,29 @@ Messenger::Messenger(C150DgmSocket *sock) {
 
 Messenger::~Messenger() { delete m_sock; }
 
-bool Messenger::send(const Packet &message) {
-    return send(vector<Packet>(1, message));
+bool Messenger::send_one(Packet &message) {
+    vector<Packet> msgs(1, message);
+    return send(msgs);
 }
 
 // returns true if successful
-bool Messenger::send(const vector<Packet> &messages) {
+bool Messenger::send(vector<Packet> &messages) {
+    Packet *packets = messages.data();
+    int npackets = messages.size();
+    seq_t minseq = m_seqno;
+
     // Build map of messages to send and SOS's files
     m_seqmap.clear();
-    auto buffer = (char *)malloc(MAX_PACKET_SIZE);
 
     // seq number of the "youngest" message in this group
-    seq_t minseq = m_seqno;
 
     c150debug->printf(C150APPLICATION, "Try to send, beginning with seqno %u\n",
                       m_seqno);
 
-    for (auto m : messages) {
-        m.hdr.seqno = m_seqno++;
-        m_seqmap[m.hdr.seqno] = &m;
+    for (int i = 0; i < npackets; i++) {
+        packets[i].hdr.seqno = m_seqno;
+        m_seqmap[m_seqno] = &packets[i];
+        m_seqno++;
     }
 
     c150debug->printf(C150APPLICATION,
@@ -51,7 +56,7 @@ bool Messenger::send(const vector<Packet> &messages) {
     for (int i = 0; i < MAX_RESEND_ATTEMPTS; i++) {
         // all messages were ACK'd!
         if (m_seqmap.size() == 0) {
-            free(buffer);
+            assert(false && "DONE SEND && RECV");
             c150debug->printf(C150APPLICATION,
                               "Completed send of %d messages\n",
                               messages.size());
@@ -71,21 +76,27 @@ bool Messenger::send(const vector<Packet> &messages) {
 
         // Read loop - wait for ACKs and remove from resend queue
         while (true) {
-            ssize_t len = m_sock->read(buffer, MAX_PACKET_SIZE);
-            if (m_sock->timedout() || len == 0)
-                break;
-            else if (len > MAX_PACKET_SIZE || len < (ssize_t)sizeof(Header)) {
-                fprintf(stderr, "read an incorrectly sized packet, strange");
+            Packet p;
+            ssize_t len = m_sock->read((char *)&p, MAX_PACKET_SIZE);
+            if (m_sock->timedout()) break;
+            if (len != p.hdr.len) {
+                c150debug->printf(
+                    C150APPLICATION,
+                    "Received a packet with length %lu but expected "
+                    "length was %d\n",
+                    len, p.hdr.len);
                 continue;
             }
 
             // Inspect packet
-            Packet *rec_p = (Packet *)buffer;
-            if (rec_p->hdr.seqno < minseq)
-                continue;
-            else if (rec_p->hdr.type == ACK)
-                m_seqmap.erase(rec_p->hdr.seqno);
-            else if (rec_p->hdr.type == SOS)  // Something went wrong
+            if (p.hdr.seqno < minseq) continue;
+
+            c150debug->printf(C150APPLICATION, "Received valid packet!\n%s\n",
+                              p.toString().c_str());
+
+            if (p.hdr.type == ACK)
+                m_seqmap.erase(p.hdr.seqno);
+            else if (p.hdr.type == SOS)  // Something went wrong
                 return false;
         }
 
@@ -95,7 +106,6 @@ bool Messenger::send(const vector<Packet> &messages) {
             m_seqmap.size());
     }
 
-    free(buffer);
     throw C150NetworkException("Network failure");
 }
 
@@ -103,7 +113,7 @@ bool Messenger::sendBlob(string blob, int blobid, string blobName) {
     vector<Packet> sectionMessages = partitionBlob(blob, blobid);
     Packet prepMessage =
         Packet().ofPrepareForBlob(blobid, blobName, sectionMessages.size());
-    return (send(prepMessage) && send(sectionMessages));
+    return (send_one(prepMessage) && send(sectionMessages));
 }
 
 vector<Packet> Messenger::partitionBlob(string blob, int blobid) {
@@ -111,18 +121,18 @@ vector<Packet> Messenger::partitionBlob(string blob, int blobid) {
     size_t pos = 0;
     uint32_t partno = 0;
 
-    c150debug->printf(C150APPLICATION,
-                      "partitioning blob message %i of length %u\n", blobid,
-                      blob.length());
-
+    Packet m;
     while (pos < blob.size()) {
-        string data_string = blob.substr(pos, MAX_PACKET_SIZE);
+        string data_string = blob.substr(pos, sizeof(m.value.section.data));
+        c150debug->printf(C150APPLICATION,
+                          "partitioning id %i partno %i of length %u\n", blobid,
+                          partno, data_string.length());
         pos += data_string.length();
-        auto data = (uint8_t *)data_string.c_str();
-        Packet m = Packet().ofBlobSection(blobid, partno++,
-                                          data_string.length(), data);
-        messages.push_back(std::move(m));
+        m.ofBlobSection(blobid, partno++, data_string.length(),
+                        (uint8_t *)data_string.c_str());
+        messages.push_back(m);
     }
+
     c150debug->printf(C150APPLICATION, "partitioned into %u messages\n",
                       messages.size());
 

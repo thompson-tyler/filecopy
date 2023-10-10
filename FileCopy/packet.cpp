@@ -57,7 +57,7 @@ Packet Packet::ofBlobSection(int id, uint32_t partno, uint32_t size,
     hdr.type = BLOB_SECTION;
     hdr.len = sizeof(hdr) + sizeof(value.section.partno) + size;
 
-    assert(hdr.len < MAX_PACKET_SIZE);
+    assert(hdr.len <= MAX_PACKET_SIZE);
     memset(&value.section, 0, sizeof(value.section));
 
     value.section.partno = partno;
@@ -99,8 +99,11 @@ string Packet::toString() {
         case CHECK_IS_NECESSARY:
             ss << "Type: "
                << "Check is necessary\n";
-            ss << "Filename: "
-               << string(value.check.filename, MAX_FILENAME_LENGTH) << endl;
+            ss << "Filename: ";
+            for (int i = 0; i < MAX_FILENAME_LENGTH && value.prep.filename[i];
+                 i++)
+                ss << value.prep.filename[i];
+            ss << endl;
             ss << "Checksum: ";
             for (int i = 0; i < SHA_DIGEST_LENGTH; i++)
                 ss << hex << value.check.checksum[i];
@@ -117,8 +120,11 @@ string Packet::toString() {
         case PREPARE_FOR_BLOB:
             ss << "Type: "
                << "Prepare for blob\n";
-            ss << "Filename: "
-               << string(value.prep.filename, MAX_FILENAME_LENGTH) << endl;
+            ss << "Filename: ";
+            for (int i = 0; i < MAX_FILENAME_LENGTH && value.prep.filename[i];
+                 i++)
+                ss << value.prep.filename[i];
+            ss << endl;
             ss << "Number of parts: " << value.prep.nparts << endl;
             break;
         case BLOB_SECTION:

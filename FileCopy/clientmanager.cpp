@@ -95,7 +95,7 @@ bool ClientManager::endToEndCheck(Messenger *m) {
         // Request the check and update status
         Message msg =
             Message().ofCheckIsNecessary(f_id, ft.filename, ft.checksum);
-        if (m->send(msg)) {
+        if (m->send_one(msg)) {
             ft.status = COMPLETED;
             ft.deleteFileData();
         }
