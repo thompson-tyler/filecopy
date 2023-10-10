@@ -1,5 +1,6 @@
 #include "packet.h"
 
+#include <cassert>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -19,18 +20,22 @@ Packet Packet::ofCheckIsNecessary(int id, std::string filename,
 
     memcpy(value.check.filename, filename.c_str(), filename.length());
     memcpy(value.check.checksum, checksum, SHA_DIGEST_LENGTH);
+
+    return *this;
 }
 
 Packet Packet::ofKeepIt(int id) {
     hdr.len = sizeof(hdr);
     hdr.fid = id;
     hdr.type = KEEP_IT;
+    return *this;
 }
 
 Packet Packet::ofDeleteIt(int id) {
     hdr.len = sizeof(hdr);
     hdr.fid = id;
     hdr.type = DELETE_IT;
+    return *this;
 }
 
 Packet Packet::ofPrepareForBlob(int id, std::string filename, uint32_t nparts) {
@@ -43,6 +48,7 @@ Packet Packet::ofPrepareForBlob(int id, std::string filename, uint32_t nparts) {
 
     memcpy(value.prep.filename, filename.c_str(), filename.length());
     value.prep.nparts = nparts;
+    return *this;
 }
 
 Packet Packet::ofBlobSection(int id, uint32_t partno, uint32_t size,
@@ -56,12 +62,19 @@ Packet Packet::ofBlobSection(int id, uint32_t partno, uint32_t size,
 
     value.section.partno = partno;
     memcpy(value.section.data, data, size);
+    return *this;
 }
 
 /* server side */
-Packet Packet::intoAck() { hdr.type = ACK; }
+Packet Packet::intoAck() {
+    hdr.type = ACK;
+    return *this;
+}
 
-Packet Packet::intoSOS() { hdr.type = SOS; }
+Packet Packet::intoSOS() {
+    hdr.type = SOS;
+    return *this;
+}
 
 int Packet::datalen() {
     assert(hdr.type == BLOB_SECTION);
@@ -118,4 +131,5 @@ string Packet::toString() {
             break;
     }
     ss << "---------------\n";
+    return ss.str();
 }

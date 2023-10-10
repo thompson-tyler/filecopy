@@ -12,7 +12,7 @@ void ServerResponder::bounce(Packet *p) {
     seq_t seqno = p->hdr.seqno;
     const CheckIsNecessary *check;
     const PrepareForBlob *prep;
-    const BlobSection *section;
+    BlobSection *section;
 
     bool shouldAck = false;  // defaults always to SOS
 
