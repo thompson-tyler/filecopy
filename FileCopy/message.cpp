@@ -1,5 +1,6 @@
 #include "message.h"
 
+#include <cassert>
 #include <cstdio>
 #include <cstdlib>
 
@@ -22,6 +23,7 @@ Message Message::ofCheckIsNecessary(int id, string filename,
                                     unsigned char checksum[SHA_DIGEST_LENGTH]) {
     m_type = CHECK_IS_NECESSARY;
     m_id = id;
+    assert(filename.length() < MAX_FILENAME_LENGTH);
     memset(m_value.check.filename, 0, MAX_FILENAME_LENGTH);
     memcpy(m_value.check.filename, filename.c_str(), filename.length());
     memcpy(m_value.check.checksum, checksum, SHA_DIGEST_LENGTH);
@@ -130,6 +132,7 @@ Packet Message::toPacket() const {
     Packet p;
     p.hdr.type = m_type;
     p.hdr.seqno = -1;
+    p.hdr.len = sizeof(m_id);
 
     // see diagram above for visual of these pointers
     memcpy(p.data, &m_id, sizeof(m_id));
@@ -143,14 +146,19 @@ Packet Message::toPacket() const {
             break;
         case CHECK_IS_NECESSARY:
             memcpy(data, &m_value.check, sizeof(m_value.check));
+            p.hdr.len += sizeof(m_value.check);
             break;
         case PREPARE_FOR_BLOB:
             memcpy(data, &m_value.prep, sizeof(m_value.prep));
+            p.hdr.len += sizeof(m_value.prep);
             break;
         case BLOB_SECTION:
-            *(int *)data = m_value.section.partno;
-            memcpy(data + sizeof(m_value.section.partno), m_value.section.data,
-                   m_value.section.len);
+            ((int *)data)[0] = m_value.section.partno;
+            ((int *)data)[1] = m_value.section.len;
+            int offset =
+                sizeof(m_value.section.partno) + sizeof(m_value.section.len);
+            memcpy(data + offset, m_value.section.data, m_value.section.len);
+            p.hdr.len += offset + m_value.section.len;
             break;
     }
     return p;
@@ -158,11 +166,9 @@ Packet Message::toPacket() const {
 
 string Message::toString() {
     stringstream ss;
-    ss << "Type:\n";
-    ss << messageTypeToString(m_type) << endl;
-    ss << "Values:\n";
-    ss << "Id:\n";
-    ss << m_id << endl;
+    ss << "Type: " << messageTypeToString(m_type) << endl;
+    ss << "Payload:\n";
+    ss << "Id: " << m_id << endl;
     switch (m_type) {
         case SOS:
         case ACK:
@@ -170,22 +176,31 @@ string Message::toString() {
         case DELETE_IT:
             break;
         case CHECK_IS_NECESSARY:
-            ss << "Filename:\n";
-            ss << m_value.check.filename << endl;
-            ss << "Checksum:\n";
+            ss << "Filename: ";
+            for (int i = 0;
+                 i < MAX_FILENAME_LENGTH && m_value.check.filename[i]; i++)
+                ss << (char)m_value.prep.filename[i];
+            ss << endl;
+            ss << "Checksum: 0x";
             for (int i = 0; i < SHA_DIGEST_LENGTH; i++)
                 ss << hex << m_value.check.checksum[i];
             ss << endl;
+            break;
         case PREPARE_FOR_BLOB:
-            ss << "Filename:\n";
-            ss << m_value.prep.filename << endl;
-            ss << "Number of sections:\n";
-            ss << m_value.prep.nparts << endl;
+            ss << "Filename: ";
+            fprintf(stderr, "%s\n", m_value.check.filename);
+            for (int i = 0;
+                 i < MAX_FILENAME_LENGTH && m_value.check.filename[i]; i++) {
+                fprintf(stderr, "%c", m_value.check.filename[i]);
+                ss << (char)m_value.check.filename[i];
+            }
+            fprintf(stderr, "\n");
+            ss << endl;
+            ss << "Number of sections:" << m_value.prep.nparts << endl;
+            break;
         case BLOB_SECTION:
-            ss << "Section number:\n";
-            ss << m_value.section.partno << endl;
-            ss << "Section len:\n";
-            ss << m_value.section.len << endl;
+            ss << "Section number: " << m_value.section.partno << endl;
+            ss << "Section len: " << m_value.section.len << endl;
             ss << "Data:\n";
             for (uint32_t i = 0; i < max(m_value.section.len, 50u); i++)
                 ss << m_value.section.data[i];
@@ -212,6 +227,7 @@ string messageTypeToString(MessageType m) {
             return string("Prepare for file");
         case BLOB_SECTION:
             return string("Section of file");
+        case SOS:
         default:
             return string("SOS");
     }

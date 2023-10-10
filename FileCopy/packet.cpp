@@ -26,9 +26,9 @@ string Packet::toString() {
     stringstream ss;
     Message m = Message(this);
     ss << "---------\n";
-    ss << "Packet:\n";
-    ss << "Seqno:" << hdr.seqno << "\n";
-    ss << "Size:" << hdr.len << "\n";
+    ss << "Packet\n";
+    ss << "Seqno: " << hdr.seqno << "\n";
+    ss << "Size: " << hdr.len << "\n";
     ss << m.toString();
     ss << "---------\n";
     return ss.str();

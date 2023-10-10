@@ -64,8 +64,6 @@ bool Messenger::send(const vector<Message> &messages) {
         for (auto &kv_pair : m_seqmap) {
             Packet p = kv_pair.second;
             p.toBuffer((uint8_t *)buffer);
-            c150debug->printf(C150APPLICATION, "Trying to send packet!\n%s\n",
-                              p.toString().c_str());
             m_sock->write(buffer, p.totalSize());
             c150debug->printf(C150APPLICATION, "Sent packet!\n%s\n",
                               p.toString().c_str());

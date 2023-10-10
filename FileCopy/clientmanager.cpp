@@ -47,7 +47,7 @@ bool ClientManager::sendFiles(Messenger *m) {
                               ft.filename.c_str(), ft.filelen);
         }
 
-        string data_string = string((char *)ft.filedata, ft.filelen + 1);
+        string data_string = string((char *)ft.filedata, ft.filelen);
 
         c150debug->printf(C150APPLICATION,
                           "Converted %s buffer to C++ string\n",

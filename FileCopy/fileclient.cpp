@@ -67,8 +67,6 @@ int main(int argc, char **argv) {
         filenames.push_back(string(makeFileName(srcdir, sourceFile->d_name)));
     }
 
-    cerr << "setting up client manager" << endl;
-
     ClientManager manager(nfp, &filenames);
     Messenger messenger(sock);
 
