@@ -179,7 +179,7 @@ string Message::toString() {
             ss << "Filename: ";
             for (int i = 0;
                  i < MAX_FILENAME_LENGTH && m_value.check.filename[i]; i++)
-                ss << (char)m_value.prep.filename[i];
+                ss << (char)m_value.check.filename[i];
             ss << endl;
             ss << "Checksum: 0x";
             for (int i = 0; i < SHA_DIGEST_LENGTH; i++)
@@ -188,13 +188,10 @@ string Message::toString() {
             break;
         case PREPARE_FOR_BLOB:
             ss << "Filename: ";
-            fprintf(stderr, "%s\n", m_value.check.filename);
-            for (int i = 0;
-                 i < MAX_FILENAME_LENGTH && m_value.check.filename[i]; i++) {
-                fprintf(stderr, "%c", m_value.check.filename[i]);
-                ss << (char)m_value.check.filename[i];
+            for (int i = 0; i < MAX_FILENAME_LENGTH && m_value.prep.filename[i];
+                 i++) {
+                ss << (char)m_value.prep.filename[i];
             }
-            fprintf(stderr, "\n");
             ss << endl;
             ss << "Number of sections:" << m_value.prep.nparts << endl;
             break;

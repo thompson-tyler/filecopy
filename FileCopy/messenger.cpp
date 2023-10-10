@@ -103,9 +103,8 @@ bool Messenger::send(const vector<Message> &messages) {
 
 bool Messenger::sendBlob(string blob, int blobid, string blobName) {
     vector<Message> sectionMessages = partitionBlob(blob, blobid);
-    vector<Message> prepMessage;
-    prepMessage.push_back(
-        Message().ofPrepareForBlob(blobid, blobName, sectionMessages.size()));
+    Message prepMessage =
+        Message().ofPrepareForBlob(blobid, blobName, sectionMessages.size());
     return (send(prepMessage) && send(sectionMessages));
 }
 
