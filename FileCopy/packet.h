@@ -76,6 +76,9 @@ struct Packet {
     Packet intoAck();
     Packet intoSOS();
 
+    /* */
+    int datalen();
+
     // for debugging
     std::string toString();
 };
