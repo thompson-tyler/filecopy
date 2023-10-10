@@ -30,7 +30,7 @@ struct Header {
     // minimum size of whole packet
     u_int32_t len;
     MessageType type;
-    seq_t seqno;
+    seq_t seqno = -1;
     fid_t fid;
 };
 
