@@ -53,8 +53,11 @@ all: nastyfiletest makedatafile sha1test
 endtoend: endtoend.cpp $(C150AR) $(INCLUDES)
 	$(CPP) -o endtoend $(CPPFLAGS) endtoend.cpp $(C150AR)
 
-main: main.cpp $(C150AR) $(INCLUDES) $(OBJ)
-	$(CPP) -o main $(CPPFLAGS) main.cpp $(C150AR) messenger.cpp
+fileclient: fileclient.cpp $(C150AR) $(INCLUDES) $(OBJ)
+	$(CPP) -o fileclient $(CPPFLAGS) fileclient.cpp $(C150AR)
+
+fileserver: fileserver.cpp $(C150AR) $(INCLUDES) $(OBJ)
+	$(CPP) -o fileserver $(CPPFLAGS) fileserver.cpp $(C150AR)
 
 #
 # Build the nastyfiletest sample
