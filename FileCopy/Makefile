@@ -86,8 +86,7 @@ tests: $(TESTS)
 	echo $(TESTS)
 
 tests/%: tests/%.cpp $(OBJ) $(INCLUDES)
-	$(CPP) -o $(patsubst tests/%,%,$@) $(CPPFLAGS) $(C150AR) $(OBJ)
-	mv $(patsubst tests/%,%,$@) tests
+	$(CPP) -o $(patsubst tests/%,%,$@) $< $(CPPFLAGS) $(C150AR) $(OBJ) 
 
 
 #
