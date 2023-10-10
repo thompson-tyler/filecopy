@@ -123,7 +123,7 @@ vector<Message> Messenger::partitionBlob(string blob, int blobid) {
         auto data = (uint8_t *)data_string.c_str();
         Message m = Message().ofBlobSection(blobid, partno++,
                                             data_string.length(), data);
-        messages.push_back(m);
+        messages.push_back(std::move(m));
     }
     c150debug->printf(C150APPLICATION, "partitioned into %u messages\n",
                       messages.size());
