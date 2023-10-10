@@ -48,17 +48,14 @@ bool Filecache::idempotentCheckfile(int id, seq_t seqno, const string filename,
     // If we haven't heard of this ID, try to perform the check on the filename
     // anyway. This is kind of a hack that lets us verify pre-existing files.
     if (!m_cache.count(id)) {
+        vector<FileSegment> nosegments;
         // cache if success (note we check the actual file not .tmp)
         if (filecheck(makeFileName(m_dir, filename), checksum)) {
-            m_idmap[id] = filename;
-            m_cache[id].seqno = seqno;
-            m_cache[id].status = FileStatus::SAVED;
+            m_cache[id] = {FileStatus::SAVED, seqno, filename, nosegments};
             return ACK;
         }
         // move to tmp file
-        m_idmap[id] = filename;
-        m_cache[id].seqno = seqno;
-        m_cache[id].status = FileStatus::TMP;
+        m_cache[id] = {FileStatus::TMP, seqno, filename, nosegments};
         rename(makeFileName(m_dir, filename).c_str(),
                makeTmpFileName(m_dir, filename).c_str());
         return SOS;
@@ -92,8 +89,8 @@ bool Filecache::idempotentSaveFile(int id, seq_t seqno) {
     auto &entry = m_cache[id];
     switch (entry.status) {
         case FileStatus::VERIFIED:
-            rename(makeTmpFileName(m_dir, m_idmap[id]).c_str(),
-                   makeFileName(m_dir, m_idmap[id]).c_str());
+            rename(makeTmpFileName(m_dir, m_cache[id].filename).c_str(),
+                   makeFileName(m_dir, m_cache[id].filename).c_str());
             entry.status = FileStatus::SAVED;
             return ACK;
         case FileStatus::SAVED:
@@ -112,7 +109,7 @@ bool Filecache::idempotentDeleteTmp(int id, seq_t seqno) {
         case FileStatus::PARTIAL:
             return ACK;
         case FileStatus::TMP:
-            remove(makeTmpFileName(m_dir, m_idmap[id]).c_str());
+            remove(makeTmpFileName(m_dir, m_cache[id].filename).c_str());
             entry.seqno = seqno;
             for (auto &section : entry.sections) {
                 free(section.data);
@@ -141,9 +138,8 @@ bool Filecache::idempotentPrepareForFile(int id, seq_t seqno,
                                m_cache[id].status == FileStatus::PARTIAL)) {
         vector<FileSegment> sections(nparts);
         // set current seqno
-        CacheEntry entry = {FileStatus::PARTIAL, seqno, sections};
+        CacheEntry entry = {FileStatus::PARTIAL, seqno, filename, sections};
         m_cache[id] = entry;
-        m_idmap[id] = filename;
         for (auto &section : m_cache[id].sections) {
             free(section.data);
             section.data = nullptr;
@@ -177,8 +173,8 @@ bool Filecache::idempotentStoreFileChunk(int id, seq_t seqno, uint32_t partno,
         entry.status = FileStatus::TMP;
         uint8_t *buffer = nullptr;
         uint32_t buflen = joinBuffers(m_cache[id].sections, &buffer);
-        for (uint8_t &section : m_cache[id].sections) free(section);
-        string tmpfile = makeTmpFileName(m_dir, m_idmap[id]);
+        for (FileSegment section : m_cache[id].sections) free(section.data);
+        string tmpfile = makeTmpFileName(m_dir, m_cache[id].filename);
         bufferToFile(m_nfp, tmpfile, buffer, buflen);
         free(buffer);
     }

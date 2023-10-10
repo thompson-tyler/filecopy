@@ -52,6 +52,7 @@ class Filecache {
         // ordered by maturity
         FileStatus status;
         seq_t seqno;
+        std::string filename;
         std::vector<FileSegment> sections;
     };
 
@@ -61,7 +62,6 @@ class Filecache {
      * filename -> ( FileStatus, min seq for redo, [ section1, NULL, ... ])
      */
     std::unordered_map<int, CacheEntry> m_cache;
-    std::unordered_map<int, std::string> m_idmap;
 
     std::string m_dir;
     C150NETWORK::C150NastyFile *m_nfp;

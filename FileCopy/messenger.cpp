@@ -60,7 +60,7 @@ bool Messenger::send(const vector<Message> &messages) {
             ssize_t len = m_sock->read(buffer, MAX_PACKET_SIZE);
             if (m_sock->timedout() || len == 0)
                 break;
-            else if (len > MAX_PACKET_SIZE || len < sizeof(Header)) {
+            else if (len > MAX_PACKET_SIZE || len < (ssize_t)sizeof(Header)) {
                 fprintf(stderr, "read an incorrectly sized packet, strange");
                 continue;
             }

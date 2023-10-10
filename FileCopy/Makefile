@@ -32,7 +32,7 @@
 
 # Do all C++ compies with g++
 CPP = g++
-CPPFLAGS = -g -Wall -Werror -I$(C150LIB) 
+CPPFLAGS = -g -Wall -Werror -I$(C150LIB)
 
 # Where the COMP 150 shared utilities live, including c150ids.a and userports.csv
 # Note that environment variable COMP117 must be set for this to work!
@@ -40,10 +40,13 @@ CPPFLAGS = -g -Wall -Werror -I$(C150LIB)
 C150LIB = $(COMP117)/files/c150Utils/
 C150AR = $(C150LIB)c150ids.a
 
-LDFLAGS = 
-INCLUDES = $(C150LIB)c150dgmsocket.h $(C150LIB)c150nastydgmsocket.h $(C150LIB)c150network.h $(C150LIB)c150exceptions.h $(C150LIB)c150debug.h $(C150LIB)c150utility.h messenger.h
+LDFLAGS =
+INCLUDES = $(C150LIB)c150dgmsocket.h $(C150LIB)c150nastydgmsocket.h $(C150LIB)c150network.h $(C150LIB)c150exceptions.h $(C150LIB)c150debug.h $(C150LIB)c150utility.h
 
-OBJ = filecache.o messenger.o responder.o packet.o manager.o message.o diskio.o
+OBJ := filecache.o messenger.o responder.o 
+OBJ += packet.o clientmanager.o message.o diskio.o
+
+TESTS = $(patsubst %.cpp,%,$(wildcard tests/*.cpp))
 
 all: nastyfiletest makedatafile sha1test
 
@@ -77,10 +80,15 @@ makedatafile: makedatafile.cpp
 %.o: %.cpp $(INCLUDES)
 	$(CPP) -c $(CPPFLAGS) $< -o $@ 
 
-#
-#
-#
-lib: filecache.o diskio.o messenger.o message.o packet.o responder.o clientmanager.o
+.PHONY: tests
+
+tests: $(TESTS)
+	echo $(TESTS)
+
+tests/%: tests/%.cpp $(OBJ) $(INCLUDES)
+	$(CPP) -o $(patsubst tests/%,%,$@) $(CPPFLAGS) $(C150AR) $(OBJ)
+	mv $(patsubst tests/%,%,$@) tests
+
 
 #
 # Delete all compiled code in preparation

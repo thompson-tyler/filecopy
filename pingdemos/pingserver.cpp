@@ -144,8 +144,8 @@ int main(int argc, char *argv[]) {
       string incoming(incomingMessage); // Convert to C++ string ...it's
                                         // slightly easier to work with, and
                                         // cleanString expects it
-      cleanString(incoming); // c150ids-supplied utility: changes
-                             // non-printing characters to .
+      cleanString(incoming);            // c150ids-supplied utility: changes
+                                        // non-printing characters to .
       c150debug->printf(C150APPLICATION,
                         "Successfully read %d bytes. Message=\"%s\"", readlen,
                         incoming.c_str());
