@@ -107,7 +107,7 @@ int fileToBufferSecure(NASTYFILE *nfp, string srcfile, uint8_t **buffer_pp,
 
 // Read whole input file (mostly taken from Noah's samples)
 int fileToBufferNaive(NASTYFILE *nfp, string srcfile, uint8_t **buffer_pp) {
-    assert(buffer_pp == nullptr);
+    assert(*buffer_pp == nullptr);
 
     struct stat statbuf;
     if (lstat(srcfile.c_str(), &statbuf) != 0) {  // maybe file doesn't exist
@@ -116,7 +116,8 @@ int fileToBufferNaive(NASTYFILE *nfp, string srcfile, uint8_t **buffer_pp) {
         return -1;
     }
 
-    uint8_t *buffer = (uint8_t *)malloc(statbuf.st_size);
+    uint8_t *buffer = (uint8_t *)malloc(statbuf.st_size + 1);
+    assert(buffer);
 
     // so file does exist -- but something else is wrong, just kill process
     void *fopenretval = nfp->fopen(srcfile.c_str(), "rb");
@@ -136,8 +137,9 @@ int fileToBufferNaive(NASTYFILE *nfp, string srcfile, uint8_t **buffer_pp) {
         exit(EXIT_FAILURE);
     }
 
+    buffer[len] = 0;
     *buffer_pp = buffer;
-    return len;
+    return statbuf.st_size;
 }
 
 // Brute force secure write (with a read sanity check)

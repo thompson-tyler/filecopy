@@ -42,7 +42,6 @@ class ClientManager {
         FileTransferStatus status;
         unsigned char checksum[SHA_DIGEST_LENGTH];
         FileTracker();
-        FileTracker(string filename);
         ~FileTracker();
     };
 

@@ -1,0 +1,36 @@
+10/10/2023 00:36:26.363082 ./fileclient: Adding tranfer of id:0 filename:SRC/data1
+
+10/10/2023 00:36:26.363133 ./fileclient: Adding tranfer of id:1 filename:SRC/data10
+
+10/10/2023 00:36:26.363175 ./fileclient: Adding tranfer of id:2 filename:SRC/data100
+
+10/10/2023 00:36:26.363214 ./fileclient: Adding tranfer of id:3 filename:SRC/data1000
+
+10/10/2023 00:36:26.363266 ./fileclient: Adding tranfer of id:4 filename:SRC/data10000
+
+10/10/2023 00:36:26.363306 ./fileclient: Adding tranfer of id:5 filename:SRC/independence.txt
+
+10/10/2023 00:36:26.363346 ./fileclient: Adding tranfer of id:6 filename:SRC/love.txt
+
+10/10/2023 00:36:26.363385 ./fileclient: Adding tranfer of id:7 filename:SRC/moor.txt
+
+10/10/2023 00:36:26.363424 ./fileclient: Adding tranfer of id:8 filename:SRC/romeo.txt
+
+10/10/2023 00:36:26.363464 ./fileclient: Adding tranfer of id:9 filename:SRC/tyger.txt
+
+10/10/2023 00:36:26.363503 ./fileclient: Adding tranfer of id:10 filename:SRC/warandpeace.txt
+
+10/10/2023 00:36:26.363543 ./fileclient: Finished set up client manager
+
+10/10/2023 00:36:26.363587 ./fileclient: Set up manager
+
+10/10/2023 00:36:26.363625 ./fileclient: Starting transfer
+
+10/10/2023 00:36:26.363663 ./fileclient: Trying to send files
+
+10/10/2023 00:36:26.363701 ./fileclient: Trying to send SRC/warandpeace.txt
+
+10/10/2023 00:36:26.377616 ./fileclient: Read SRC/warandpeace.txt to buffer of length 3223437
+
+10/10/2023 00:36:26.377637 ./fileclient: Converting SRC/warandpeace.txt buffer to C++ string
+

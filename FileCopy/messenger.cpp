@@ -3,6 +3,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "c150debug.h"
 #include "c150network.h"
 #include "message.h"
 #include "packet.h"
@@ -11,9 +12,11 @@ using namespace C150NETWORK;
 using namespace std;
 
 Messenger::Messenger(C150DgmSocket *sock) {
-    m_sock = new C150DgmSocket();
+    m_sock = sock;
     m_sock->turnOnTimeouts(MESSENGER_TIMEOUT);
     m_seqno = 0;
+
+    c150debug->printf(C150APPLICATION, "Set up manager\n");
 }
 
 Messenger::~Messenger() { delete m_sock; }

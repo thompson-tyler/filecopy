@@ -40,7 +40,7 @@ CPPFLAGS = -g -Wall -Werror -I$(C150LIB)
 C150LIB = $(COMP117)/files/c150Utils/
 C150AR = $(C150LIB)c150ids.a
 
-LDFLAGS =
+LDFLAGS = -lssl -lcrypto
 INCLUDES = $(C150LIB)c150dgmsocket.h $(C150LIB)c150nastydgmsocket.h $(C150LIB)c150network.h $(C150LIB)c150exceptions.h $(C150LIB)c150debug.h $(C150LIB)c150utility.h
 
 OBJ := filecache.o messenger.o responder.o 
@@ -48,16 +48,16 @@ OBJ += packet.o clientmanager.o message.o diskio.o
 
 TESTS = $(patsubst %.cpp,%,$(wildcard tests/*.cpp))
 
-all: nastyfiletest makedatafile sha1test
+all: nastyfiletest makedatafile sha1test fileclient fileserver
 
-endtoend: endtoend.cpp $(C150AR) $(INCLUDES)
-	$(CPP) -o endtoend $(CPPFLAGS) endtoend.cpp $(C150AR) $(OBJ)
+endtoend: endtoend.cpp $(C150AR) $(INCLUDES) $(OBJ)
+	$(CPP) -o endtoend $(CPPFLAGS) endtoend.cpp $(C150AR) $(OBJ) $(LDFLAGS)
 
 fileclient: fileclient.cpp $(C150AR) $(INCLUDES) $(OBJ)
-	$(CPP) -o fileclient $(CPPFLAGS) fileclient.cpp $(C150AR) $(OBJ)
+	$(CPP) -o fileclient $(CPPFLAGS) fileclient.cpp $(C150AR) $(OBJ) $(LDFLAGS)
 
 fileserver: fileserver.cpp $(C150AR) $(INCLUDES) $(OBJ)
-	$(CPP) -o fileserver $(CPPFLAGS) fileserver.cpp $(C150AR)
+	$(CPP) -o fileserver $(CPPFLAGS) fileserver.cpp $(C150AR) $(OBJ) $(LDFLAGS)
 
 #
 # Build the nastyfiletest sample
@@ -86,10 +86,9 @@ makedatafile: makedatafile.cpp
 .PHONY: tests
 
 tests: $(TESTS)
-	echo $(TESTS)
 
-tests/%: tests/%.cpp $(OBJ) $(INCLUDES)
-	$(CPP) -o $(patsubst tests/%,%,$@) $< $(CPPFLAGS) $(C150AR) $(OBJ) 
+tests/%: tests/%.cpp $(OBJ) $(INCLUDES) $(C150AR)
+	$(CPP) -o $@ $< $(CPPFLAGS) $(C150AR) $(OBJ) $(LDFLAGS)
 
 
 #
@@ -97,6 +96,7 @@ tests/%: tests/%.cpp $(OBJ) $(INCLUDES)
 # for forcing complete rebuild#
 
 clean:
-	 rm -f nastyfiletest sha1test makedatafile *.o main endtoend
+	 rm -f nastyfiletest sha1test makedatafile fileclient fileserver \
+	 	 *.o main endtoend
 
 

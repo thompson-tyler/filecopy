@@ -1,55 +1,65 @@
-
-// class ClientManager {
-//    public:
-//     // loads all files from dir
-//     ClientManager(C150NETWORK::C150NastyFile *nfp, std::string dir);
-//
-//     // loop through directory and send all the files
-//     bool sendFiles(Messenger &m);
-//
-//    private:
-//     bool openFiles();
-//
-//     // if it's in here it IS a file
-//     unordered_map<std::string, uint8_t *> m_filebufs;
-//
-//     std::string m_dir;
-//     C150NETWORK::C150NastyFile *m_nfp;
-// };
-//
 #include "clientmanager.h"
 
 #include <cassert>
 #include <cstddef>
+
+#include "c150debug.h"
 
 ClientManager::ClientManager(C150NastyFile *nfp, vector<string> *filenames) {
     assert(nfp && filenames);
     m_nfp = nfp;
 
     int f_id = 0;
-    for (auto &fname : *filenames) {
-        FileTracker ft(fname);
-        m_filemap[f_id++] = ft;
+    for (string fname : *filenames) {
+        c150debug->printf(C150APPLICATION,
+                          "Adding tranfer of id:%d filename:%s\n", f_id,
+                          fname.c_str());
+
+        m_filemap[f_id] = FileTracker();
+        m_filemap[f_id].filename = fname;
+        f_id++;
     }
+
+    c150debug->printf(C150APPLICATION, "Finished set up client manager\n");
 }
 
 bool ClientManager::sendFiles(Messenger *m) {
     assert(m);
 
+    c150debug->printf(C150APPLICATION, "Trying to send files\n");
+
     for (auto &kv_pair : m_filemap) {
         int f_id = kv_pair.first;
         FileTracker &ft = kv_pair.second;
+
+        c150debug->printf(C150APPLICATION, "Trying to send %s\n",
+                          ft.filename.c_str());
 
         // Skip files that have been transfered
         if (ft.status != LOCALONLY) continue;
 
         // Read file into memory if not already
-        if (!ft.filedata)
-            fileToBuffer(m_nfp, ft.filename, &ft.filedata, ft.checksum);
-        string data_string = string((char *)ft.filedata, ft.filelen);
+        if (!ft.filedata) {
+            ft.filelen =
+                fileToBuffer(m_nfp, ft.filename, &ft.filedata, ft.checksum);
+            c150debug->printf(C150APPLICATION,
+                              "Read %s to buffer of length %d\n",
+                              ft.filename.c_str(), ft.filelen);
+        }
+
+        c150debug->printf(C150APPLICATION,
+                          "Converting %s buffer to C++ string\n",
+                          ft.filename.c_str());
+
+        string data_string = string((char *)ft.filedata, ft.filelen + 1);
+
+        c150debug->printf(C150APPLICATION, "Trying to send file %s %n\n");
 
         // Try at most MAX_SOS_COUNT times to send each file
         for (int i = 0; i < MAX_SOS_COUNT; i++) {
+            c150debug->printf(C150APPLICATION, "Trying to send file %s %n\n",
+                              ft.filename.c_str());
+
             // Send file using messenger
             bool success = m->sendBlob(data_string, f_id, ft.filename);
 
@@ -105,6 +115,8 @@ bool ClientManager::endToEndCheck(Messenger *m) {
 void ClientManager::transfer(Messenger *m) {
     assert(m);
 
+    c150debug->printf(C150APPLICATION, "Starting transfer\n");
+
     while (true) {
         bool send_status = sendFiles(m);
         bool check_status = endToEndCheck(m);
@@ -115,14 +127,6 @@ void ClientManager::transfer(Messenger *m) {
 ClientManager::FileTracker::FileTracker() {
     filedata = nullptr;
     filelen = -1;
-    status = LOCALONLY;
-    memset(checksum, 0, SHA_DIGEST_LENGTH);
-}
-
-ClientManager::FileTracker::FileTracker(string filename) {
-    filedata = nullptr;
-    filelen = -1;
-    filename = filename;
     status = LOCALONLY;
     memset(checksum, 0, SHA_DIGEST_LENGTH);
 }
