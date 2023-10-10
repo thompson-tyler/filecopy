@@ -44,7 +44,7 @@ struct CheckIsNecessary {
 
 struct PrepareForBlob {
     char filename[MAX_FILENAME_LENGTH];
-    uint32_t *nparts;
+    uint32_t nparts;
 };
 
 struct BlobSection {
