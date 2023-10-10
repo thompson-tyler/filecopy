@@ -13,7 +13,8 @@ Message::Message() {
 }
 
 Message::~Message() {
-    if (m_type == BLOB_SECTION) free(m_value.section.data);
+    if (m_type == BLOB_SECTION && m_value.section.data)
+        free(m_value.section.data);
 }
 
 const MessageType Message::type() { return m_type; }
@@ -58,6 +59,7 @@ Message Message::ofBlobSection(int id, uint32_t partno, uint32_t len,
     m_id = id;
     m_value.section.partno = partno;
     m_value.section.data = (uint8_t *)malloc(len);
+    m_value.section.len = len;
     memcpy(m_value.section.data, data, len);
     return *this;
 }

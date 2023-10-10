@@ -64,8 +64,7 @@ bool ClientManager::sendFiles(Messenger *m) {
             // Update status based on whether transfer succeeded
             if (success) {
                 ft.status = EXISTSREMOTE;
-                free(ft.filedata);
-                ft.filedata = nullptr;
+                ft.deleteFileData();
                 break;
             }
         }
@@ -98,7 +97,7 @@ bool ClientManager::endToEndCheck(Messenger *m) {
             Message().ofCheckIsNecessary(f_id, ft.filename, ft.checksum);
         if (m->send(msg)) {
             ft.status = COMPLETED;
-            free(ft.filedata);
+            ft.deleteFileData();
         }
     }
 
@@ -129,4 +128,11 @@ ClientManager::FileTracker::FileTracker() {
     memset(checksum, 0, SHA_DIGEST_LENGTH);
 }
 
-ClientManager::FileTracker::~FileTracker() { free(filedata); }
+ClientManager::FileTracker::~FileTracker() { deleteFileData(); }
+
+void ClientManager::FileTracker::deleteFileData() {
+    if (filedata) {
+        free(filedata);
+        filedata = nullptr;
+    }
+}

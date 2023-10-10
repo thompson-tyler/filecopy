@@ -43,6 +43,7 @@ class ClientManager {
         unsigned char checksum[SHA_DIGEST_LENGTH];
         FileTracker();
         ~FileTracker();
+        void deleteFileData();
     };
 
     // if it's in here it IS a local file
