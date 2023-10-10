@@ -1,8 +1,9 @@
 #ifndef PACKET_H
 #define PACKET_H
 
+#include <openssl/sha.h>
+
 #include "c150dgmsocket.h"
-#include "openssl/sha.h"
 #include "settings.h"
 
 typedef int seq_t;

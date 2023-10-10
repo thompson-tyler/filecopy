@@ -1,7 +1,6 @@
 #include "responder.h"
 
 #include "c150debug.h"
-#include "message.h"
 
 using namespace std;
 using namespace C150NETWORK;
@@ -10,7 +9,6 @@ ServerResponder::ServerResponder(Filecache *cache) { m_cache = cache; }
 
 // modifies packet in place
 void ServerResponder::bounce(Packet *p) {
-    Message m = Message(p);
     seq_t seqno = p->hdr.seqno;
     const CheckIsNecessary *check;
     const PrepareForBlob *prep;
@@ -18,7 +16,7 @@ void ServerResponder::bounce(Packet *p) {
 
     bool shouldAck = false;  // defaults always to SOS
 
-    switch (m.type()) {
+    switch (p->hdr.type) {
         case SOS:
             shouldAck = false;
             break;
@@ -26,25 +24,26 @@ void ServerResponder::bounce(Packet *p) {
             shouldAck = true;
             break;
         case KEEP_IT:
-            shouldAck = m_cache->idempotentSaveFile(m.id(), seqno);
+            shouldAck = m_cache->idempotentSaveFile(p->hdr.fid, seqno);
             break;
         case DELETE_IT:
-            shouldAck = m_cache->idempotentDeleteTmp(m.id(), seqno);
+            shouldAck = m_cache->idempotentDeleteTmp(p->hdr.fid, seqno);
             break;
         case CHECK_IS_NECESSARY:
-            check = m.getCheckIsNecessary();
+            check = p->value.check;
             shouldAck = m_cache->idempotentCheckfile(
-                m.id(), seqno, check->filename, check->checksum);
+                p->hdr.fid, seqno, check->filename, check->checksum);
             break;
         case PREPARE_FOR_BLOB:
-            prep = m.getPrepareForBlob();
+            prep = p->value.prep;
             shouldAck = m_cache->idempotentPrepareForFile(
-                m.id(), seqno, prep->filename, prep->nparts);
+                p->hdr.fid, seqno, prep->filename, prep->nparts);
             break;
         case BLOB_SECTION:
-            section = m.getBlobSection();
+            section = p->value.section;
             shouldAck = m_cache->idempotentStoreFileChunk(
-                m.id(), seqno, section->partno, section->data, section->len);
+                p->hdr.fid, seqno, section->partno, section->data,
+                section->datalen());
             break;
     }
     c150debug->printf(C150APPLICATION, "Going to %s!\n",

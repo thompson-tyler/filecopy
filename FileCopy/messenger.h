@@ -8,7 +8,6 @@
 #include "c150dgmsocket.h"
 #include "c150grading.h"
 #include "c150nastydgmsocket.h"
-#include "message.h"
 #include "packet.h"
 #include "settings.h"
 
@@ -20,8 +19,8 @@ class Messenger {
     // Sends a message and makes sure it is acknowledged.
     // Returns true if successful, aborts and returns false if SOS (TODO: make
     // sure this is what we want).
-    bool send(const Message &message);
-    bool send(const vector<Message> &messages);
+    bool send(const Packet &message);
+    bool send(const vector<Packet> &messages);
 
     // 1. Creates and sends client Message of PREPARE_FOR_BLOB and waits
     // until it's acknowledged.
@@ -33,14 +32,14 @@ class Messenger {
     bool sendBlob(std::string blob, int blobid, std::string blobName);
 
    private:
-    std::vector<Message> partitionBlob(string blob, int blobid);
+    std::vector<Packet> partitionBlob(string blob, int blobid);
 
     std::string read();
 
     C150NETWORK::C150DgmSocket *m_sock;
     seq_t m_seqno;
 
-    unordered_map<seq_t, Packet> m_seqmap;
+    unordered_map<seq_t, Packet *> m_seqmap;
 };
 
 #endif

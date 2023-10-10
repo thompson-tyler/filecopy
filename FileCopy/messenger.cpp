@@ -5,7 +5,6 @@
 
 #include "c150debug.h"
 #include "c150network.h"
-#include "message.h"
 #include "packet.h"
 
 using namespace C150NETWORK;
@@ -21,12 +20,12 @@ Messenger::Messenger(C150DgmSocket *sock) {
 
 Messenger::~Messenger() { delete m_sock; }
 
-bool Messenger::send(const Message &message) {
-    return send(vector<Message>(1, message));
+bool Messenger::send(const Packet &message) {
+    return send(vector<Packet>(1, message));
 }
 
 // returns true if successful
-bool Messenger::send(const vector<Message> &messages) {
+bool Messenger::send(const vector<Packet> &messages) {
     // Build map of messages to send and SOS's files
     m_seqmap.clear();
     auto buffer = (char *)malloc(MAX_PACKET_SIZE);
@@ -37,10 +36,9 @@ bool Messenger::send(const vector<Message> &messages) {
     c150debug->printf(C150APPLICATION, "Try to send, beginning with seqno %u\n",
                       m_seqno);
 
-    for (auto &m : messages) {
-        Packet p = m.toPacket();
-        p.hdr.seqno = m_seqno++;
-        m_seqmap[p.hdr.seqno] = p;
+    for (auto m : messages) {
+        m.hdr.seqno = m_seqno++;
+        m_seqmap[m.hdr.seqno] = &m;
     }
 
     c150debug->printf(C150APPLICATION,
@@ -62,11 +60,10 @@ bool Messenger::send(const vector<Message> &messages) {
 
         // Send all un-ACK'd messages
         for (auto &kv_pair : m_seqmap) {
-            Packet p = kv_pair.second;
-            p.toBuffer((uint8_t *)buffer);
-            m_sock->write(buffer, p.totalSize());
+            Packet *p = kv_pair.second;
+            m_sock->write((const char *)p, p->hdr.len);
             c150debug->printf(C150APPLICATION, "Sent packet!\n%s\n",
-                              p.toString().c_str());
+                              p->toString().c_str());
         }
 
         c150debug->printf(C150APPLICATION, "Sent %d un-ACK'd messages\n",
@@ -82,12 +79,13 @@ bool Messenger::send(const vector<Message> &messages) {
                 continue;
             }
 
-            Packet p = Packet((uint8_t *)buffer);
-            if (p.hdr.seqno < minseq)
+            // Inspect packet
+            Packet *rec_p = (Packet *)buffer;
+            if (rec_p->hdr.seqno < minseq)
                 continue;
-            else if (p.hdr.type == ACK)
-                m_seqmap.erase(p.hdr.seqno);
-            else if (p.hdr.type == SOS)  // Something went wrong
+            else if (rec_p->hdr.type == ACK)
+                m_seqmap.erase(rec_p->hdr.seqno);
+            else if (rec_p->hdr.type == SOS)  // Something went wrong
                 return false;
         }
 
@@ -102,14 +100,14 @@ bool Messenger::send(const vector<Message> &messages) {
 }
 
 bool Messenger::sendBlob(string blob, int blobid, string blobName) {
-    vector<Message> sectionMessages = partitionBlob(blob, blobid);
-    Message prepMessage =
-        Message().ofPrepareForBlob(blobid, blobName, sectionMessages.size());
+    vector<Packet> sectionMessages = partitionBlob(blob, blobid);
+    Packet prepMessage =
+        Packet().ofPrepareForBlob(blobid, blobName, sectionMessages.size());
     return (send(prepMessage) && send(sectionMessages));
 }
 
-vector<Message> Messenger::partitionBlob(string blob, int blobid) {
-    vector<Message> messages;
+vector<Packet> Messenger::partitionBlob(string blob, int blobid) {
+    vector<Packet> messages;
     size_t pos = 0;
     uint32_t partno = 0;
 
@@ -118,11 +116,11 @@ vector<Message> Messenger::partitionBlob(string blob, int blobid) {
                       blob.length());
 
     while (pos < blob.size()) {
-        string data_string = blob.substr(pos, MAX_DATA_SIZE);
+        string data_string = blob.substr(pos, MAX_PACKET_SIZE);
         pos += data_string.length();
         auto data = (uint8_t *)data_string.c_str();
-        Message m = Message().ofBlobSection(blobid, partno++,
-                                            data_string.length(), data);
+        Packet m = Packet().ofBlobSection(blobid, partno++,
+                                          data_string.length(), data);
         messages.push_back(std::move(m));
     }
     c150debug->printf(C150APPLICATION, "partitioned into %u messages\n",
