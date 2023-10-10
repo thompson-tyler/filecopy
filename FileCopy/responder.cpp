@@ -40,6 +40,7 @@ void ServerResponder::bounce(Packet *p) {
             prep = m.getPrepareForBlob();
             shouldAck = m_cache->idempotentPrepareForFile(
                 m.id(), seqno, prep->filename, prep->nparts);
+            break;
         case BLOB_SECTION:
             section = m.getBlobSection();
             shouldAck = m_cache->idempotentStoreFileChunk(

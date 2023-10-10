@@ -54,7 +54,7 @@ Message Message::ofPrepareForBlob(int id, std::string filename,
 
 Message Message::ofBlobSection(int id, uint32_t partno, uint32_t len,
                                const uint8_t *data) {
-    m_type = PREPARE_FOR_BLOB;
+    m_type = BLOB_SECTION;
     m_id = id;
     m_value.section.partno = partno;
     m_value.section.data = (uint8_t *)malloc(len);

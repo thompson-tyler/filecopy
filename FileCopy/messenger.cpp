@@ -123,11 +123,10 @@ vector<Message> Messenger::partitionBlob(string blob, int blobid) {
         auto data = (uint8_t *)data_string.c_str();
         Message m = Message().ofBlobSection(blobid, partno++,
                                             data_string.length(), data);
-        c150debug->printf(C150APPLICATION,
-                          "created message with partno: %i of length %u\n",
-                          partno, data_string.length());
         messages.push_back(m);
     }
+    c150debug->printf(C150APPLICATION, "partitioned into %u messages\n",
+                      messages.size());
 
     return messages;
 }
