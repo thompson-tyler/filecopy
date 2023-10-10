@@ -51,10 +51,10 @@ TESTS = $(patsubst %.cpp,%,$(wildcard tests/*.cpp))
 all: nastyfiletest makedatafile sha1test
 
 endtoend: endtoend.cpp $(C150AR) $(INCLUDES)
-	$(CPP) -o endtoend $(CPPFLAGS) endtoend.cpp $(C150AR)
+	$(CPP) -o endtoend $(CPPFLAGS) endtoend.cpp $(C150AR) $(OBJ)
 
 fileclient: fileclient.cpp $(C150AR) $(INCLUDES) $(OBJ)
-	$(CPP) -o fileclient $(CPPFLAGS) fileclient.cpp $(C150AR)
+	$(CPP) -o fileclient $(CPPFLAGS) fileclient.cpp $(C150AR) $(OBJ)
 
 fileserver: fileserver.cpp $(C150AR) $(INCLUDES) $(OBJ)
 	$(CPP) -o fileserver $(CPPFLAGS) fileserver.cpp $(C150AR)

@@ -1,8 +1,8 @@
 #ifndef RESPONDER_H
 #define RESPONDER_H
 
-#include "c150dgmsocket.h"
 #include "c150nastydgmsocket.h"
+#include "c150nastyfile.h"
 #include "filecache.h"
 #include "packet.h"
 
