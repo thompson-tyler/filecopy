@@ -1,5 +1,6 @@
 #include "responder.h"
 
+#include "c150debug.h"
 #include "message.h"
 
 using namespace std;
@@ -45,6 +46,8 @@ void ServerResponder::bounce(Packet *p) {
                 m.id(), seqno, section->partno, section->data, section->len);
             break;
     }
+    c150debug->printf(C150APPLICATION, "Going to %s!\n",
+                      shouldAck ? "ACK" : "SOS");
 
     // pretty simple, modify incoming packet hdr in place
     p->hdr.type = shouldAck ? ACK : SOS;
@@ -61,14 +64,20 @@ void listen(C150DgmSocket *sock, C150NastyFile *nfp, string dir) {
 
     while (true) {
         unsigned long len = sock->read((char *)buffer, sizeof(Packet));
+
         if (len > MAX_PACKET_SIZE || len < sizeof(Header)) {
             fprintf(stderr, "read an incorrectly sized packet, strange");
             continue;
         }
+
         p = Packet(buffer);
+        c150debug->printf(C150APPLICATION, "Read a packet!\n%s",
+                          p.toString().c_str());
         responder.bounce(&p);
         p.toBuffer(buffer);
         sock->write((const char *)buffer, p.totalSize());
+        c150debug->printf(C150APPLICATION, "Responded!\n%s",
+                          p.toString().c_str());
     }
 
     free(buffer);

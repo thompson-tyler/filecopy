@@ -32,11 +32,11 @@ bool ClientManager::sendFiles(Messenger *m) {
         int f_id = kv_pair.first;
         FileTracker &ft = kv_pair.second;
 
-        c150debug->printf(C150APPLICATION, "Trying to send %s\n",
-                          ft.filename.c_str());
-
         // Skip files that have been transfered
         if (ft.status != LOCALONLY) continue;
+
+        c150debug->printf(C150APPLICATION, "Trying to transfer %s\n",
+                          ft.filename.c_str());
 
         // Read file into memory if not already
         if (!ft.filedata) {
@@ -47,17 +47,15 @@ bool ClientManager::sendFiles(Messenger *m) {
                               ft.filename.c_str(), ft.filelen);
         }
 
-        c150debug->printf(C150APPLICATION,
-                          "Converting %s buffer to C++ string\n",
-                          ft.filename.c_str());
-
         string data_string = string((char *)ft.filedata, ft.filelen + 1);
 
-        c150debug->printf(C150APPLICATION, "Trying to send file %s %n\n");
+        c150debug->printf(C150APPLICATION,
+                          "Converted %s buffer to C++ string\n",
+                          ft.filename.c_str());
 
         // Try at most MAX_SOS_COUNT times to send each file
         for (int i = 0; i < MAX_SOS_COUNT; i++) {
-            c150debug->printf(C150APPLICATION, "Trying to send file %s %n\n",
+            c150debug->printf(C150APPLICATION, "Trying to send file %s\n",
                               ft.filename.c_str());
 
             // Send file using messenger

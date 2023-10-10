@@ -187,8 +187,9 @@ string Message::toString() {
             ss << "Section len:\n";
             ss << m_value.section.len << endl;
             ss << "Data:\n";
-            for (uint32_t i = 0; i < m_value.section.len; i++)
+            for (uint32_t i = 0; i < max(m_value.section.len, 50u); i++)
                 ss << m_value.section.data[i];
+            if (m_value.section.len > 50) ss << "...\n";
             ss << endl;
             break;
     }

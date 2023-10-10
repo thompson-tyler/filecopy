@@ -1,5 +1,6 @@
 #include "diskio.h"
 
+#include "c150debug.h"
 #include "settings.h"
 
 #ifndef MAX_DISK_RETRIES
@@ -47,18 +48,6 @@ bool bufferToFileSecure(NASTYFILE *nfp, string srcfile, uint8_t *buffer,
 // returns -1 in disk error
 // guarantees that file read off disk is correct by trying repeatedly and
 // matching hashcodes
-int fileToBuffer(NASTYFILE *nfp, string dir, string filename,
-                 uint8_t **buffer_pp, unsigned char checksum[SHA_LEN]) {
-    string srcfile = makeFileName(dir, filename);
-    return fileToBuffer(nfp, srcfile, buffer_pp, checksum);
-}
-
-bool bufferToFile(NASTYFILE *nfp, string dir, string filename, uint8_t *buffer,
-                  uint32_t bufferlen) {
-    string srcfile = makeFileName(dir, filename);
-    return bufferToFile(nfp, srcfile, buffer, bufferlen);
-}
-
 int fileToBuffer(NASTYFILE *nfp, string srcfile, uint8_t **buffer_pp,
                  unsigned char checksum[SHA_LEN]) {
     if (!isFile(srcfile)) {
@@ -81,13 +70,14 @@ bool bufferToFile(NASTYFILE *nfp, string srcfile, uint8_t *buffer,
 // needs to have 2 flawless of MAX_DISK_RETRIES reads
 int fileToBufferSecure(NASTYFILE *nfp, string srcfile, uint8_t **buffer_pp,
                        unsigned char checksumOut[SHA_LEN]) {
-    unsigned char checksums[MAX_DISK_RETRIES][SHA_LEN];
+    assert(*buffer_pp == nullptr && checksumOut);
+    unsigned char checksums[MAX_DISK_RETRIES][SHA_LEN] = {0};
     for (int i = 0; i < MAX_DISK_RETRIES; i++) {  // for each try
         uint8_t *buffer = nullptr;
         int buflen = fileToBufferNaive(nfp, srcfile, &buffer);
-        if (buflen == -1) {
-            return -1;
-        }
+        assert(buffer);
+        if (buflen == -1) return -1;
+
         SHA1(buffer, buflen, checksums[i]);
         for (int j = 0; j < i; j++) {  // for each past checksum
             if (memcmp(checksums[j], checksums[i], SHA_LEN) == 0) {
@@ -96,7 +86,13 @@ int fileToBufferSecure(NASTYFILE *nfp, string srcfile, uint8_t **buffer_pp,
                 return buflen;
             }
         }
-        free(buffer);
+
+        if (1 < i)
+            c150debug->printf(C150APPLICATION,
+                              "failed read of %s for %ith time\n",
+                              srcfile.c_str(), i);
+
+        free(buffer);  // bad buffer
     }
 
     fprintf(stderr,
@@ -139,7 +135,7 @@ int fileToBufferNaive(NASTYFILE *nfp, string srcfile, uint8_t **buffer_pp) {
 
     buffer[len] = 0;
     *buffer_pp = buffer;
-    return statbuf.st_size;
+    return len;
 }
 
 // Brute force secure write (with a read sanity check)
@@ -159,6 +155,10 @@ bool bufferToFileSecure(NASTYFILE *nfp, string srcfile, uint8_t *buffer,
         fileToBufferSecure(nfp, srcfile, &diskbuf, diskChecksum);
         free(diskbuf);
         if (memcmp(bufferChecksum, diskChecksum, SHA_LEN) == 0) return true;
+
+        c150debug->printf(C150APPLICATION,
+                          "failed write of %d bytes in %s for %ith time\n",
+                          bufferlen, srcfile.c_str(), i);
     }
 
     fprintf(stderr,

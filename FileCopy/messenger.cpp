@@ -22,8 +22,7 @@ Messenger::Messenger(C150DgmSocket *sock) {
 Messenger::~Messenger() { delete m_sock; }
 
 bool Messenger::send(const Message &message) {
-    vector<Message> v(1, message);
-    return send(v);
+    return send(vector<Message>(1, message));
 }
 
 // returns true if successful
@@ -35,11 +34,18 @@ bool Messenger::send(const vector<Message> &messages) {
     // seq number of the "youngest" message in this group
     seq_t minseq = m_seqno;
 
+    c150debug->printf(C150APPLICATION, "Try to send, beginning with seqno %u\n",
+                      m_seqno);
+
     for (auto &m : messages) {
         Packet p = m.toPacket();
         p.hdr.seqno = m_seqno++;
         m_seqmap[p.hdr.seqno] = p;
     }
+
+    c150debug->printf(C150APPLICATION,
+                      "Assigned packets and sequences to %d messages\n",
+                      messages.size());
 
     // Try sending batches until all messages are ACK'd or network failure
     // TODO: could also try making this smarter, maybe we detect a stall
@@ -48,6 +54,9 @@ bool Messenger::send(const vector<Message> &messages) {
         // all messages were ACK'd!
         if (m_seqmap.size() == 0) {
             free(buffer);
+            c150debug->printf(C150APPLICATION,
+                              "Completed send of %d messages\n",
+                              messages.size());
             return true;
         }
 
@@ -55,8 +64,15 @@ bool Messenger::send(const vector<Message> &messages) {
         for (auto &kv_pair : m_seqmap) {
             Packet p = kv_pair.second;
             p.toBuffer((uint8_t *)buffer);
+            c150debug->printf(C150APPLICATION, "Trying to send packet!\n%s\n",
+                              p.toString().c_str());
             m_sock->write(buffer, p.totalSize());
+            c150debug->printf(C150APPLICATION, "Sent packet!\n%s\n",
+                              p.toString().c_str());
         }
+
+        c150debug->printf(C150APPLICATION, "Sent %d un-ACK'd messages\n",
+                          m_seqmap.size());
 
         // Read loop - wait for ACKs and remove from resend queue
         while (true) {
@@ -76,6 +92,11 @@ bool Messenger::send(const vector<Message> &messages) {
             else if (p.hdr.type == SOS)  // Something went wrong
                 return false;
         }
+
+        c150debug->printf(
+            C150APPLICATION,
+            "Send round complete, resending %d un-ACK'd messages\n",
+            m_seqmap.size());
     }
 
     free(buffer);
@@ -94,12 +115,22 @@ vector<Message> Messenger::partitionBlob(string blob, int blobid) {
     vector<Message> messages;
     size_t pos = 0;
     uint32_t partno = 0;
+
+    c150debug->printf(C150APPLICATION,
+                      "partitioning blob message %i of length %u\n", blobid,
+                      blob.length());
+
     while (pos < blob.size()) {
         string data_string = blob.substr(pos, MAX_DATA_SIZE);
+        pos += data_string.length();
         auto data = (uint8_t *)data_string.c_str();
         Message m = Message().ofBlobSection(blobid, partno++,
                                             data_string.length(), data);
+        c150debug->printf(C150APPLICATION,
+                          "created message with partno: %i of length %u\n",
+                          partno, data_string.length());
         messages.push_back(m);
     }
+
     return messages;
 }

@@ -32,7 +32,7 @@
 
 # Do all C++ compies with g++
 CPP = g++
-CPPFLAGS = -g -Wall -Werror -I$(C150LIB)
+CPPFLAGS = -g -Wall -Werror -I$(C150LIB) -std=c++11
 
 # Where the COMP 150 shared utilities live, including c150ids.a and userports.csv
 # Note that environment variable COMP117 must be set for this to work!
@@ -44,14 +44,11 @@ LDFLAGS = -lssl -lcrypto
 INCLUDES = $(C150LIB)c150dgmsocket.h $(C150LIB)c150nastydgmsocket.h $(C150LIB)c150network.h $(C150LIB)c150exceptions.h $(C150LIB)c150debug.h $(C150LIB)c150utility.h
 
 OBJ := filecache.o messenger.o responder.o 
-OBJ += packet.o clientmanager.o message.o diskio.o
+OBJ += packet.o clientmanager.o message.o diskio.o utils.o
 
 TESTS = $(patsubst %.cpp,%,$(wildcard tests/*.cpp))
 
 all: nastyfiletest makedatafile sha1test fileclient fileserver
-
-endtoend: endtoend.cpp $(C150AR) $(INCLUDES) $(OBJ)
-	$(CPP) -o endtoend $(CPPFLAGS) endtoend.cpp $(C150AR) $(OBJ) $(LDFLAGS)
 
 fileclient: fileclient.cpp $(C150AR) $(INCLUDES) $(OBJ)
 	$(CPP) -o fileclient $(CPPFLAGS) fileclient.cpp $(C150AR) $(OBJ) $(LDFLAGS)

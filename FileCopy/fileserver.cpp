@@ -13,6 +13,7 @@ using namespace C150NETWORK;
 int main(int argc, char **argv) {
     // TODO: uncomment
     // GRADEME(argc, argv);
+    setUpDebugLogging("serverlog.txt", argc, argv);
 
     if (argc != 4) {
         fprintf(stderr,
