@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "c150network.h"
+#include "message.h"
 #include "packet.h"
 
 using namespace C150NETWORK;
@@ -16,6 +17,11 @@ Messenger::Messenger(C150DgmSocket *sock) {
 }
 
 Messenger::~Messenger() { delete m_sock; }
+
+bool Messenger::send(const Message &message) {
+    vector<Message> v(1, message);
+    return send(v);
+}
 
 // returns true if successful
 bool Messenger::send(const vector<Message> &messages) {

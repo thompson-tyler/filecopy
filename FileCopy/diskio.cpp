@@ -92,7 +92,7 @@ int fileToBufferSecure(NASTYFILE *nfp, string srcfile, uint8_t **buffer_pp,
         for (int j = 0; j < i; j++) {  // for each past checksum
             if (memcmp(checksums[j], checksums[i], SHA_LEN) == 0) {
                 *buffer_pp = buffer;
-                memcpy(checksumOut, checksums[i], SHA_LEN);
+                if (checksumOut) memcpy(checksumOut, checksums[i], SHA_LEN);
                 return buflen;
             }
         }

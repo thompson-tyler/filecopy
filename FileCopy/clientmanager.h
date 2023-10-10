@@ -1,22 +1,29 @@
 #ifndef MANAGER_H
 #define MANAGER_H
 
+#include <openssl/sha.h>
+#include <sys/stat.h>
+
+#include <string>
 #include <unordered_map>
+#include <vector>
 
 #include "c150dgmsocket.h"
 #include "c150nastyfile.h"
-#include "files.h"
+#include "diskio.h"
 #include "messenger.h"
+#include "settings.h"
+
+using namespace C150NETWORK;
+using namespace std;
 
 // This is the class that manages the state machine for the client
 class ClientManager {
    public:
     // loads all files from dir
-    ClientManager(C150NETWORK::C150NastyFile *nfp,
-                  std::vector<std::string> *filenames);
+    ClientManager(C150NastyFile *nfp, vector<string> *filenames);
 
-    // loop through filemap and send all the files
-    bool sendFiles(Messenger *m);
+    void transfer(Messenger *m);
 
     // loop through filemap and E2E verify all the files
     bool endToEndCheck(Messenger *m);
@@ -30,18 +37,23 @@ class ClientManager {
 
     struct FileTracker {
         uint8_t *filedata;
-        int filelen;
-        std::string filename;
+        size_t filelen;
+        string filename;
         FileTransferStatus status;
-        int SOScount;
-        FileTracker(std::string filename);
+        unsigned char checksum[SHA_DIGEST_LENGTH];
+        FileTracker();
+        FileTracker(string filename);
         ~FileTracker();
     };
 
     // if it's in here it IS a local file
     unordered_map<int, FileTracker> m_filemap;
 
-    C150NETWORK::C150NastyFile *m_nfp;
+    C150NastyFile *m_nfp;
+
+    // loop through filemap and send all the files
+    // returns false if some files reached the SOS limit
+    bool sendFiles(Messenger *m);
 };
 
 #endif

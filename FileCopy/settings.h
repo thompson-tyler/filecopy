@@ -8,4 +8,7 @@
 #define MESSENGER_TIMEOUT 1000
 #define MAX_RESEND_ATTEMPTS 8
 
+// Number of times the client manager will try to send a file before giving up
+#define MAX_SOS_COUNT 4
+
 #endif

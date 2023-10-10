@@ -20,6 +20,7 @@ class Messenger {
     // Sends a message and makes sure it is acknowledged.
     // Returns true if successful, aborts and returns false if SOS (TODO: make
     // sure this is what we want).
+    bool send(const Message &message);
     bool send(const vector<Message> &messages);
 
     // 1. Creates and sends client Message of PREPARE_FOR_BLOB and waits
