@@ -60,26 +60,23 @@ void listen(C150DgmSocket *sock, C150NastyFile *nfp, string dir) {
     Filecache cache = Filecache(dir, nfp);
     ServerResponder responder = ServerResponder(&cache);
 
-    uint8_t *buffer = (uint8_t *)malloc(MAX_PACKET_SIZE + 20);
     Packet p;
-
     while (true) {
-        unsigned long len = sock->read((char *)buffer, sizeof(Packet));
-
-        if (len > MAX_PACKET_SIZE || len < sizeof(Header)) {
-            fprintf(stderr, "read an incorrectly sized packet, strange");
+        unsigned long len = sock->read((char *)&p, sizeof(Packet));
+        if (len != p.hdr.len) {
+            c150debug->printf(C150APPLICATION,
+                              "Received a packet with length %lu but expected "
+                              "length was %d\n",
+                              len, p.hdr.len);
             continue;
         }
 
-        p = Packet(buffer);
         c150debug->printf(C150APPLICATION, "Read a packet!\n%s",
                           p.toString().c_str());
+        // modify in place
         responder.bounce(&p);
-        p.toBuffer(buffer);
-        sock->write((const char *)buffer, p.totalSize());
+        sock->write((const char *)&p, p.hdr.len);
         c150debug->printf(C150APPLICATION, "Responded!\n%s",
                           p.toString().c_str());
     }
-
-    free(buffer);
 }
