@@ -30,20 +30,20 @@ void ServerResponder::bounce(Packet *p) {
             shouldAck = m_cache->idempotentDeleteTmp(p->hdr.fid, seqno);
             break;
         case CHECK_IS_NECESSARY:
-            check = p->value.check;
+            check = &(p->value.check);
             shouldAck = m_cache->idempotentCheckfile(
                 p->hdr.fid, seqno, check->filename, check->checksum);
             break;
         case PREPARE_FOR_BLOB:
-            prep = p->value.prep;
+            prep = &(p->value.prep);
             shouldAck = m_cache->idempotentPrepareForFile(
                 p->hdr.fid, seqno, prep->filename, prep->nparts);
             break;
         case BLOB_SECTION:
-            section = p->value.section;
+            section = &(p->value.section);
             shouldAck = m_cache->idempotentStoreFileChunk(
                 p->hdr.fid, seqno, section->partno, section->data,
-                section->datalen());
+                p->datalen());
             break;
     }
     c150debug->printf(C150APPLICATION, "Going to %s!\n",
