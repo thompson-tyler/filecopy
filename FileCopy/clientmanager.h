@@ -13,7 +13,7 @@ class ClientManager {
    public:
     // loads all files from dir
     ClientManager(C150NETWORK::C150NastyFile *nfp,
-                  std::vector<std::string> files);
+                  std::vector<std::string> *filenames);
 
     // loop through filemap and send all the files
     bool sendFiles(Messenger *m);

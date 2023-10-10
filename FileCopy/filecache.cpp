@@ -105,7 +105,6 @@ bool Filecache::idempotentSaveFile(int id, seq_t seqno) {
 }
 
 bool Filecache::idempotentDeleteTmp(int id, seq_t seqno) {
-    // TODO: this should try to delete the file
     if (!m_cache.count(id)) return SOS;
 
     auto &entry = m_cache[id];
@@ -178,6 +177,7 @@ bool Filecache::idempotentStoreFileChunk(int id, seq_t seqno, uint32_t partno,
         entry.status = FileStatus::TMP;
         uint8_t *buffer = nullptr;
         uint32_t buflen = joinBuffers(m_cache[id].sections, &buffer);
+        for (uint8_t &section : m_cache[id].sections) free(section);
         string tmpfile = makeTmpFileName(m_dir, m_idmap[id]);
         bufferToFile(m_nfp, tmpfile, buffer, buflen);
         free(buffer);

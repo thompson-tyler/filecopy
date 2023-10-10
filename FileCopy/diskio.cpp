@@ -59,10 +59,6 @@ bool bufferToFile(NASTYFILE *nfp, string dir, string filename, uint8_t *buffer,
     return bufferToFile(nfp, srcfile, buffer, bufferlen);
 }
 
-/*
- *
- */
-
 int fileToBuffer(NASTYFILE *nfp, string srcfile, uint8_t **buffer_pp,
                  unsigned char checksum[SHA_LEN]) {
     if (!isFile(srcfile)) {

@@ -35,13 +35,13 @@ Any _smartness_ is an optimization.
 ```
 | HEADER ...                  | DATA ...                                   |
 | i32 msg | i32 seq | u32 len | DATA ...                                   |
-| SOS     |                   | i32 id | DATA ...                          |
-| ACK     |                   | i32 id | DATA ...                          |
-| PREPARE |                   | i32 id | i8[80] filename | u32 nparts      |
-| SECTION |                   | i32 id | u32 partno | u8[len - 8] data     |
-| CHECK   |                   | i32 id | i8[80] filename | u8[20] checksum |
-| KEEP    |                   | i32 id |                                   |
-| DELETE  |                   | i32 id |                                   |
+| SOS     | i32 seq | u32 len | i32 id | DATA ...                          |
+| ACK     | i32 seq | u32 len | i32 id | DATA ...                          |
+| PREPARE | i32 seq | u32 len | i32 id | i8[80] filename | u32 nparts      |
+| SECTION | i32 seq | u32 len | i32 id | u32 partno | u8[len - 8] data     |
+| CHECK   | i32 seq | u32 len | i32 id | i8[80] filename | u8[20] checksum |
+| KEEP    | i32 seq | u32 len | i32 id |                                   |
+| DELETE  | i32 seq | u32 len | i32 id |                                   |
 ```
 
 - `SOS` is always constructed as a response to a previous packet. To construct

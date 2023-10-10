@@ -23,8 +23,8 @@
 using namespace C150NETWORK;
 using namespace std;
 
-ClientManager::ClientManager(C150NastyFile *nfp, vector<string> *files) {
-    assert(nfp);
+ClientManager::ClientManager(C150NastyFile *nfp, vector<string> *filenames) {
+    assert(nfp && filenames);
     m_nfp = nfp;
     // TODO: load all files from directory into m_filemap
 }
