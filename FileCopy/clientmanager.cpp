@@ -5,9 +5,11 @@
 
 #include "c150debug.h"
 
-ClientManager::ClientManager(C150NastyFile *nfp, vector<string> *filenames) {
+ClientManager::ClientManager(C150NastyFile *nfp, string dir,
+                             vector<string> *filenames) {
     assert(nfp && filenames);
     m_nfp = nfp;
+    m_dir = dir;
 
     int f_id = 0;
     for (string fname : *filenames) {
@@ -40,8 +42,8 @@ bool ClientManager::sendFiles(Messenger *m) {
 
         // Read file into memory if not already
         if (!ft.filedata) {
-            ft.filelen =
-                fileToBuffer(m_nfp, ft.filename, &ft.filedata, ft.checksum);
+            ft.filelen = fileToBuffer(m_nfp, makeFileName(m_dir, ft.filename),
+                                      &ft.filedata, ft.checksum);
             c150debug->printf(C150APPLICATION,
                               "Read %s to buffer of length %d\n",
                               ft.filename.c_str(), ft.filelen);
@@ -68,6 +70,8 @@ bool ClientManager::sendFiles(Messenger *m) {
                 break;
             }
         }
+
+        assert(false && "DONE SEND ONE FILE!!!");
     }
 
     // Return false if some files failed to send
@@ -90,7 +94,8 @@ bool ClientManager::endToEndCheck(Messenger *m) {
 
         // Read file into memory if not already
         if (!ft.filedata)
-            fileToBuffer(m_nfp, ft.filename, &ft.filedata, ft.checksum);
+            fileToBuffer(m_nfp, makeFileName(m_dir, ft.filename), &ft.filedata,
+                         ft.checksum);
 
         // Request the check and update status
         Message msg =
@@ -114,11 +119,8 @@ void ClientManager::transfer(Messenger *m) {
 
     c150debug->printf(C150APPLICATION, "Starting transfer\n");
 
-    while (true) {
-        bool send_status = sendFiles(m);
-        bool check_status = endToEndCheck(m);
-        if (send_status && check_status) break;
-    }
+    while (!(sendFiles(m)))  // && endToEndCheck(m)))
+        c150debug->printf(C150APPLICATION, "RE-Starting transfer\n");
 }
 
 ClientManager::FileTracker::FileTracker() {

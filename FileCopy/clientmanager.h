@@ -21,7 +21,7 @@ using namespace std;
 class ClientManager {
    public:
     // loads all files from dir
-    ClientManager(C150NastyFile *nfp, vector<string> *filenames);
+    ClientManager(C150NastyFile *nfp, string dir, vector<string> *filenames);
 
     void transfer(Messenger *m);
 
@@ -50,6 +50,7 @@ class ClientManager {
     unordered_map<int, FileTracker> m_filemap;
 
     C150NastyFile *m_nfp;
+    string m_dir;
 
     // loop through filemap and send all the files
     // returns false if some files reached the SOS limit

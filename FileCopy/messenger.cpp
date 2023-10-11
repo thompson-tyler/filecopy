@@ -56,7 +56,6 @@ bool Messenger::send(vector<Packet> &messages) {
     for (int i = 0; i < MAX_RESEND_ATTEMPTS; i++) {
         // all messages were ACK'd!
         if (m_seqmap.size() == 0) {
-            assert(false && "DONE SEND && RECV");
             c150debug->printf(C150APPLICATION,
                               "Completed send of %d messages\n",
                               messages.size());

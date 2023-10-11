@@ -64,10 +64,10 @@ int main(int argc, char **argv) {
 
         // do the copy -- this will check for and
         // skip subdirectories
-        filenames.push_back(string(makeFileName(srcdir, sourceFile->d_name)));
+        filenames.push_back(string(sourceFile->d_name));
     }
 
-    ClientManager manager(nfp, &filenames);
+    ClientManager manager(nfp, string(srcdir), &filenames);
     Messenger messenger(sock);
 
     // Send files
