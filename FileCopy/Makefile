@@ -48,7 +48,9 @@ OBJ += packet.o clientmanager.o diskio.o utils.o
 
 TESTS = $(patsubst %.cpp,%,$(wildcard tests/*.cpp))
 
-all: nastyfiletest makedatafile sha1test fileclient fileserver
+default: fileclient fileserver
+
+all: default nastyfiletest makedatafile sha1test
 
 fileclient: fileclient.cpp $(C150AR) $(INCLUDES) $(OBJ)
 	$(CPP) -o fileclient $(CPPFLAGS) fileclient.cpp $(C150AR) $(OBJ) $(LDFLAGS)

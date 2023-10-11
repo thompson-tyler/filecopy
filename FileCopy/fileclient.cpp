@@ -71,10 +71,18 @@ int main(int argc, char **argv) {
     Messenger messenger(sock);
 
     try {
-        // Send files
-        manager.transfer(&messenger);
+        bool check_success = false;
+        while (!check_success) {
+            // Send files
+            manager.transfer(&messenger);
+            cerr << "File transfer complete, starting e2e" << endl;
+
+            check_success = manager.endToEndCheck(&messenger);
+            cerr << "End to end check " << (check_success ? "passed" : "failed")
+                 << endl;
+        }
     } catch (C150Exception &e) {
-        cerr << "nastyfiletest:copyfile(): Caught C150Exception: "
-             << e.formattedExplanation() << endl;
+        cerr << "fileclient: Caught C150Exception: " << e.formattedExplanation()
+             << endl;
     }
 }

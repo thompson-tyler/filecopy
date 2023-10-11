@@ -189,6 +189,17 @@ bool bufferToFileNaive(NASTYFILE *nfp, string srcfile, uint8_t *buffer,
     return true;
 }
 
+void touch(NASTYFILE *nfp, string fname) {
+    if (nfp->fopen(fname.c_str(), "w") == NULL) {
+        cerr << "Error opening output file " << fname << endl;
+        exit(8);
+    }
+    if (nfp->fclose()) {
+        cerr << "Error closing output file " << fname << endl;
+        exit(16);
+    }
+}
+
 //
 //
 // Utilities

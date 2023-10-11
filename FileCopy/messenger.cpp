@@ -30,15 +30,15 @@ bool Messenger::send_one(Packet &message) {
 bool Messenger::send(vector<Packet> &messages) {
     Packet *packets = messages.data();
     int npackets = messages.size();
+    // seq number of the "youngest" message in this group
     seq_t minseq = m_seqno;
 
     // Build map of messages to send and SOS's files
     m_seqmap.clear();
 
-    // seq number of the "youngest" message in this group
-
-    c150debug->printf(C150APPLICATION, "Try to send, beginning with seqno %u\n",
-                      m_seqno);
+    c150debug->printf(C150APPLICATION,
+                      "Try to send %d messages, beginning with seqno %u\n",
+                      npackets, m_seqno);
 
     for (int i = 0; i < npackets; i++) {
         packets[i].hdr.seqno = m_seqno;
@@ -48,12 +48,12 @@ bool Messenger::send(vector<Packet> &messages) {
 
     c150debug->printf(C150APPLICATION,
                       "Assigned packets and sequences to %d messages\n",
-                      messages.size());
+                      npackets);
 
     // Try sending batches until all messages are ACK'd or network failure
     // TODO: could also try making this smarter, maybe we detect a stall
     // mathematically
-    for (int i = 0; i < MAX_RESEND_ATTEMPTS; i++) {
+    for (int send_fails = 0; send_fails < MAX_RESEND_ATTEMPTS;) {
         // all messages were ACK'd!
         if (m_seqmap.size() == 0) {
             c150debug->printf(C150APPLICATION,
@@ -77,6 +77,7 @@ bool Messenger::send(vector<Packet> &messages) {
                           m_seqmap.size());
 
         // Read loop - wait for ACKs and remove from resend queue
+        int num_acked = 0;
         while (true) {
             Packet p;
             ssize_t len = m_sock->read((char *)&p, MAX_PACKET_SIZE);
@@ -92,24 +93,29 @@ bool Messenger::send(vector<Packet> &messages) {
 
             // Inspect packet
             if (p.hdr.seqno < minseq) continue;
-
-            // c150debug->printf(C150APPLICATION, "Received valid
-            // packet!\n%s\n",
-            //                   p.toString().c_str());
-
-            if (p.hdr.type == ACK)
+            if (p.hdr.type == ACK) {
+                if (m_seqmap.find(p.hdr.seqno) == m_seqmap.end()) continue;
                 m_seqmap.erase(p.hdr.seqno);
-            else if (p.hdr.type == SOS)  // Something went wrong
+                num_acked++;
+            } else if (p.hdr.type == SOS)  // Something went wrong
                 return false;
         }
 
-        c150debug->printf(
-            C150APPLICATION,
-            "Send round complete, resending %d un-ACK'd messages\n",
-            m_seqmap.size());
+        if (num_acked == 0) send_fails++;
+
+        c150debug->printf(C150APPLICATION,
+                          "Send round complete, sent %d messages, received %d "
+                          "ACKs, resending %d un-ACK'd messages\n",
+                          throttle, num_acked, m_seqmap.size());
+        cerr << "Send round complete, sent " << throttle << " messages, "
+             << "received " << num_acked << " ACKs, " << m_seqmap.size()
+             << " messages remaining\n";
     }
 
-    throw C150NetworkException("Messenger failure, network error");
+    c150debug->printf(C150APPLICATION,
+                      "Failed to send %d messages after %d attempts\n",
+                      messages.size(), MAX_RESEND_ATTEMPTS);
+    return false;
 }
 
 bool Messenger::sendBlob(string blob, int blobid, string blobName) {
@@ -127,16 +133,17 @@ vector<Packet> Messenger::partitionBlob(string blob, int blobid) {
     Packet m;
     while (pos < blob.size()) {
         string data_string = blob.substr(pos, sizeof(m.value.section.data));
-        c150debug->printf(C150APPLICATION,
-                          "partitioning id %i partno %i of length %u\n", blobid,
-                          partno, data_string.length());
+        // c150debug->printf(C150APPLICATION,
+        //                   "partitioning id %i partno %i of length %u\n",
+        //                   blobid, partno, data_string.length());
         pos += data_string.length();
         m.ofBlobSection(blobid, partno++, data_string.length(),
                         (uint8_t *)data_string.c_str());
         messages.push_back(m);
     }
 
-    c150debug->printf(C150APPLICATION, "partitioned into %u messages\n",
+    c150debug->printf(C150APPLICATION,
+                      "finished partitioning into %u messages\n",
                       messages.size());
 
     return messages;

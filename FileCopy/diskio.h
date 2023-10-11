@@ -3,6 +3,8 @@
 
 #include <openssl/sha.h>
 
+#include <string>
+
 #include "c150nastyfile.h"
 #include "settings.h"
 
@@ -17,6 +19,10 @@ int fileToBuffer(C150NETWORK::C150NastyFile *nfp, string srcfile,
 
 bool bufferToFile(C150NETWORK::NASTYFILE *nfp, string srcfile, uint8_t *buffer,
                   uint32_t bufferlen);
+
+// Creates an empty file with the given filename
+// If the file already exists, it is truncated
+void touch(C150NETWORK::NASTYFILE *nfp, string fname);
 
 // // all guaranteed safe
 // int filesize(char *fname);

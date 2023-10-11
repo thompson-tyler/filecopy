@@ -41,7 +41,6 @@ void ServerResponder::bounce(Packet *p) {
             break;
         case BLOB_SECTION:
             section = &(p->value.section);
-            cerr << "DATALEN" << p->datalen() << endl;
             shouldAck = m_cache->idempotentStoreFileChunk(
                 p->hdr.fid, seqno, section->partno, section->data,
                 p->datalen());

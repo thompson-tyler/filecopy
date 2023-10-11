@@ -32,7 +32,7 @@ Filecache::Filecache(string dir, C150NastyFile *nfp) {
 
 // returns true if file is good
 bool Filecache::filecheck(string filename, const checksum_t checksum) {
-    uint8_t *buffer;
+    uint8_t *buffer = nullptr;
     uint8_t diskChecksum[SHA_DIGEST_LENGTH];
 
     // fileToBuffer guarantees no nastyfile issues
@@ -190,6 +190,7 @@ bool Filecache::idempotentStoreFileChunk(int id, seq_t seqno, uint32_t partno,
         }
 
         string tmpfile = makeTmpFileName(m_dir, m_cache[id].filename);
+        touch(m_nfp, tmpfile);
         bufferToFile(m_nfp, tmpfile, buffer, buflen);
         free(buffer);
     }

@@ -65,7 +65,8 @@ bool ClientManager::sendFiles(Messenger *m) {
             // Send file using messenger
             bool success = m->sendBlob(data_string, f_id, ft.filename);
 
-            cerr << "completed send of " << ft.filename << endl;
+            cerr << "transfer of " << ft.filename
+                 << (success ? " succeeded" : " failed") << endl;
 
             // Update status based on whether transfer succeeded
             if (success) {
@@ -74,8 +75,6 @@ bool ClientManager::sendFiles(Messenger *m) {
                 break;
             }
         }
-
-        assert(false && "DONE SEND ONE FILE!!!");
     }
 
     // Return false if some files failed to send
@@ -83,6 +82,7 @@ bool ClientManager::sendFiles(Messenger *m) {
         FileTracker &ft = kv_pair.second;
         if (ft.status == LOCALONLY) return false;
     }
+    cerr << "all files transfered" << endl;
     return true;
 }
 
@@ -102,18 +102,26 @@ bool ClientManager::endToEndCheck(Messenger *m) {
                          ft.checksum);
 
         // Request the check and update status
-        Message msg =
-            Message().ofCheckIsNecessary(f_id, ft.filename, ft.checksum);
+        Packet msg =
+            Packet().ofCheckIsNecessary(f_id, ft.filename, ft.checksum);
         if (m->send_one(msg)) {
             ft.status = COMPLETED;
             ft.deleteFileData();
+            msg = Packet().ofKeepIt(f_id);
+            m->send_one(msg);
+        } else {
+            ft.status = LOCALONLY;
+            // msg = Packet().ofDeleteIt(f_id);
+            // m->send_one(msg);
         }
+
+        ft.deleteFileData();
     }
 
     // Return false if some files failed the check
     for (auto &kv_pair : m_filemap) {
         FileTracker &ft = kv_pair.second;
-        if (ft.status == EXISTSREMOTE) return false;
+        if (ft.status != COMPLETED) return false;
     }
     return true;
 }
