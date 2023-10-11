@@ -70,6 +70,11 @@ int main(int argc, char **argv) {
     ClientManager manager(nfp, string(srcdir), &filenames);
     Messenger messenger(sock);
 
-    // Send files
-    manager.transfer(&messenger);
+    try {
+        // Send files
+        manager.transfer(&messenger);
+    } catch (C150Exception &e) {
+        cerr << "nastyfiletest:copyfile(): Caught C150Exception: "
+             << e.formattedExplanation() << endl;
+    }
 }

@@ -60,8 +60,12 @@ bool ClientManager::sendFiles(Messenger *m) {
             c150debug->printf(C150APPLICATION, "Trying to send file %s\n",
                               ft.filename.c_str());
 
+            cerr << "sending " << ft.filename << endl;
+
             // Send file using messenger
             bool success = m->sendBlob(data_string, f_id, ft.filename);
+
+            cerr << "completed send of " << ft.filename << endl;
 
             // Update status based on whether transfer succeeded
             if (success) {

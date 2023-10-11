@@ -67,8 +67,8 @@ bool Messenger::send(vector<Packet> &messages) {
         for (auto &kv_pair : m_seqmap) {
             Packet *p = kv_pair.second;
             m_sock->write((const char *)p, p->hdr.len);
-            c150debug->printf(C150APPLICATION, "Sent packet!\n%s\n",
-                              p->toString().c_str());
+            // c150debug->printf(C150APPLICATION, "Sent packet!\n%s\n",
+            //                   p->toString().c_str());
             if (++throttle == MAX_SEND_GROUP)
                 break;  // don't send too many at a time
         }
@@ -93,8 +93,9 @@ bool Messenger::send(vector<Packet> &messages) {
             // Inspect packet
             if (p.hdr.seqno < minseq) continue;
 
-            c150debug->printf(C150APPLICATION, "Received valid packet!\n%s\n",
-                              p.toString().c_str());
+            // c150debug->printf(C150APPLICATION, "Received valid
+            // packet!\n%s\n",
+            //                   p.toString().c_str());
 
             if (p.hdr.type == ACK)
                 m_seqmap.erase(p.hdr.seqno);
@@ -108,7 +109,7 @@ bool Messenger::send(vector<Packet> &messages) {
             m_seqmap.size());
     }
 
-    throw C150NetworkException("Network failure");
+    throw C150NetworkException("Messenger failure, network error");
 }
 
 bool Messenger::sendBlob(string blob, int blobid, string blobName) {

@@ -1,5 +1,7 @@
 #include "filecache.h"
 
+#include <cstdio>
+
 #include "c150debug.h"
 #include "diskio.h"
 
@@ -22,7 +24,6 @@ using namespace std;
 #define SOS false
 
 // small readability adjustment
-typedef const unsigned char checksum_t[SHA_DIGEST_LENGTH];
 
 Filecache::Filecache(string dir, C150NastyFile *nfp) {
     m_dir = dir;
@@ -30,7 +31,7 @@ Filecache::Filecache(string dir, C150NastyFile *nfp) {
 }
 
 // returns true if file is good
-bool Filecache::filecheck(string filename, checksum_t checksum) {
+bool Filecache::filecheck(string filename, const checksum_t checksum) {
     uint8_t *buffer;
     uint8_t diskChecksum[SHA_DIGEST_LENGTH];
 
@@ -45,7 +46,7 @@ bool Filecache::filecheck(string filename, checksum_t checksum) {
 
 // no need to be careful about repeatedly calling these
 bool Filecache::idempotentCheckfile(int id, seq_t seqno, const string filename,
-                                    checksum_t checksum) {
+                                    const checksum_t checksum) {
     // If we haven't heard of this ID, try to perform the check on the filename
     // anyway. This is kind of a hack that lets us verify pre-existing files.
     if (!m_cache.count(id)) {
@@ -161,13 +162,15 @@ bool Filecache::idempotentStoreFileChunk(int id, seq_t seqno, uint32_t partno,
 
     auto &entry = m_cache[id];
     if (entry.status == FileStatus::PARTIAL) {
-        c150debug->printf(C150APPLICATION,
-                          "Trying to insert section %d into cache %d.\n",
-                          partno, id);
+        c150debug->printf(
+            C150APPLICATION,
+            "Trying to insert %d bytes in section %d of cache %d.\n", len,
+            partno, id);
         // add fresh section, if seqno is more recent than when file was first
         // announced
         if (entry.seqno < seqno && entry.sections[partno].data == nullptr) {
             entry.sections[partno].len = len;
+            entry.sections[partno].data = (uint8_t *)malloc(len);
             memcpy(entry.sections[partno].data, data, len);
         }
 

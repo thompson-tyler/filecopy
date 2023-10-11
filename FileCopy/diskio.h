@@ -4,6 +4,9 @@
 #include <openssl/sha.h>
 
 #include "c150nastyfile.h"
+#include "settings.h"
+
+typedef unsigned char checksum_t[SHA_DIGEST_LENGTH];
 
 // reads file into a buffer, buffer_pp should be nullptr
 // returns length of new buffer or -1 if failed
@@ -14,6 +17,15 @@ int fileToBuffer(C150NETWORK::C150NastyFile *nfp, string srcfile,
 
 bool bufferToFile(C150NETWORK::NASTYFILE *nfp, string srcfile, uint8_t *buffer,
                   uint32_t bufferlen);
+
+// // all guaranteed safe
+// int filesize(char *fname);
+// int filechecksum(C150NETWORK::NASTYFILE *nfp, char *fname, checksum_t
+// checksum); int fileread(C150NETWORK::NASTYFILE *nfp, char *fname, int offset,
+// int len,
+//              uint8_t **buffer_pp);
+// int filewrite(C150NETWORK::NASTYFILE *nfp, char *fname, int offset, int len,
+//               uint8_t *buffer);
 
 // utils
 void checkDirectory(char *dirname);
