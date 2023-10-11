@@ -1,5 +1,6 @@
 #include "filecache.h"
 
+#include "c150debug.h"
 #include "diskio.h"
 
 using namespace C150NETWORK;
@@ -136,6 +137,9 @@ bool Filecache::idempotentPrepareForFile(int id, seq_t seqno,
     // 2. The status is PARTIAL and a **NEW** message tells us to start over
     if (!m_cache.count(id) || (m_cache[id].seqno < seqno &&
                                m_cache[id].status == FileStatus::PARTIAL)) {
+        c150debug->printf(C150APPLICATION,
+                          "preparing for file %s, id %d with %d parts.\n",
+                          filename.c_str(), id, nparts);
         vector<FileSegment> sections(nparts);
         // set current seqno
         CacheEntry entry = {FileStatus::PARTIAL, seqno, filename, sections};
@@ -157,12 +161,14 @@ bool Filecache::idempotentStoreFileChunk(int id, seq_t seqno, uint32_t partno,
 
     auto &entry = m_cache[id];
     if (entry.status == FileStatus::PARTIAL) {
+        c150debug->printf(C150APPLICATION,
+                          "Trying to insert section %d into cache %d.\n",
+                          partno, id);
         // add fresh section, if seqno is more recent than when file was first
         // announced
         if (entry.seqno < seqno && entry.sections[partno].data == nullptr) {
-            free(entry.sections[partno].data = data);
-            entry.sections[partno].data = data;
             entry.sections[partno].len = len;
+            memcpy(entry.sections[partno].data, data, len);
         }
 
         // if any sections are still null, we are still partial
@@ -173,7 +179,13 @@ bool Filecache::idempotentStoreFileChunk(int id, seq_t seqno, uint32_t partno,
         entry.status = FileStatus::TMP;
         uint8_t *buffer = nullptr;
         uint32_t buflen = joinBuffers(m_cache[id].sections, &buffer);
-        for (FileSegment section : m_cache[id].sections) free(section.data);
+
+        // no data segments can still be nullptr
+        for (FileSegment &section : m_cache[id].sections) {
+            free(section.data);
+            section.data = nullptr;
+        }
+
         string tmpfile = makeTmpFileName(m_dir, m_cache[id].filename);
         bufferToFile(m_nfp, tmpfile, buffer, buflen);
         free(buffer);

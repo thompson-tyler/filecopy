@@ -63,11 +63,14 @@ bool Messenger::send(vector<Packet> &messages) {
         }
 
         // Send all un-ACK'd messages
+        int throttle = 0;
         for (auto &kv_pair : m_seqmap) {
             Packet *p = kv_pair.second;
             m_sock->write((const char *)p, p->hdr.len);
             c150debug->printf(C150APPLICATION, "Sent packet!\n%s\n",
                               p->toString().c_str());
+            if (++throttle == MAX_SEND_GROUP)
+                break;  // don't send too many at a time
         }
 
         c150debug->printf(C150APPLICATION, "Sent %d un-ACK'd messages\n",

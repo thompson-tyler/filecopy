@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <iomanip>
 #include <sstream>
 
 using namespace std;
@@ -131,9 +132,6 @@ string Packet::toString() {
             ss << "Type: "
                << "Blob section\n";
             ss << "Section number: " << value.section.partno << endl;
-            ss << "Data: "
-               << string((char *)value.section.data, std::max(datalen(), 30))
-               << endl;
             break;
     }
     ss << "---------------\n";
