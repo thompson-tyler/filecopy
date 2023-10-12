@@ -11,24 +11,30 @@ ClientManager::ClientManager(C150NastyFile *nfp, string dir,
     m_nfp = nfp;
     m_dir = dir;
 
-    int f_id = 0;
-    for (string fname : *filenames) {
-        c150debug->printf(C150APPLICATION,
-                          "Adding tranfer of id:%d filename:%s\n", f_id,
-                          fname.c_str());
+    c150debug->printf(C150APPLICATION, "Starting setup of client manager\n");
 
-        m_filemap[f_id] = FileTracker();
-        m_filemap[f_id].filename = fname;
-        f_id++;
+    for (unsigned int i = 0; i < filenames->size(); i++) {
+        string fname = filenames->at(i);
+        c150debug->printf(
+            C150APPLICATION,
+            "Adding transfer to client manager: id=%d, filename=%s\n", i,
+            fname.c_str());
+        m_filemap[i] = FileTracker();
+        m_filemap[i].filename = fname;
     }
 
     c150debug->printf(C150APPLICATION, "Finished set up client manager\n");
 }
 
+ClientManager::~ClientManager() {
+    for (auto &kv_pair : m_filemap) {
+        FileTracker &ft = kv_pair.second;
+        ft.deleteFileData();
+    }
+}
+
 bool ClientManager::sendFiles(Messenger *m) {
     assert(m);
-
-    c150debug->printf(C150APPLICATION, "Trying to send files\n");
 
     for (auto &kv_pair : m_filemap) {
         int f_id = kv_pair.first;
@@ -37,43 +43,29 @@ bool ClientManager::sendFiles(Messenger *m) {
         // Skip files that have been transfered
         if (ft.status != LOCALONLY) continue;
 
-        c150debug->printf(C150APPLICATION, "Trying to transfer %s\n",
-                          ft.filename.c_str());
-
         // Read file into memory if not already
-        if (!ft.filedata) {
+        if (!ft.filedata)
             ft.filelen = fileToBuffer(m_nfp, makeFileName(m_dir, ft.filename),
                                       &ft.filedata, ft.checksum);
-            c150debug->printf(C150APPLICATION,
-                              "Read %s to buffer of length %d\n",
-                              ft.filename.c_str(), ft.filelen);
-        }
 
+        // Convert file data to string for sending
         string data_string = string((char *)ft.filedata, ft.filelen);
 
-        c150debug->printf(C150APPLICATION,
-                          "Converted %s buffer to C++ string\n",
+        c150debug->printf(C150APPLICATION, "Trying to send file %s\n",
                           ft.filename.c_str());
 
-        // Try at most MAX_SOS_COUNT times to send each file
-        for (int i = 0; i < MAX_SOS_COUNT; i++) {
-            c150debug->printf(C150APPLICATION, "Trying to send file %s\n",
+        // Send file using messenger
+        bool success = m->sendBlob(data_string, f_id, ft.filename);
+
+        // Update status based on whether transfer succeeded
+        if (success) {
+            c150debug->printf(C150APPLICATION, "File transfer successful: %s\n",
                               ft.filename.c_str());
-
-            cerr << "sending " << ft.filename << endl;
-
-            // Send file using messenger
-            bool success = m->sendBlob(data_string, f_id, ft.filename);
-
-            cerr << "transfer of " << ft.filename
-                 << (success ? " succeeded" : " failed") << endl;
-
-            // Update status based on whether transfer succeeded
-            if (success) {
-                ft.status = EXISTSREMOTE;
-                ft.deleteFileData();
-                break;
-            }
+            ft.status = EXISTSREMOTE;
+            ft.deleteFileData();
+        } else {
+            c150debug->printf(C150APPLICATION, "File transfer failed: %s\n",
+                              ft.filename.c_str());
         }
     }
 
@@ -82,8 +74,19 @@ bool ClientManager::sendFiles(Messenger *m) {
         FileTracker &ft = kv_pair.second;
         if (ft.status == LOCALONLY) return false;
     }
-    cerr << "all files transfered" << endl;
     return true;
+}
+
+void ClientManager::transfer(Messenger *m) {
+    assert(m);
+
+    c150debug->printf(C150APPLICATION, "Starting file transfer\n");
+
+    while (!sendFiles(m))
+        c150debug->printf(C150APPLICATION,
+                          "Some file transfers failed, retrying\n");
+
+    c150debug->printf(C150APPLICATION, "File transfer succeeded\n");
 }
 
 bool ClientManager::endToEndCheck(Messenger *m) {
@@ -101,19 +104,18 @@ bool ClientManager::endToEndCheck(Messenger *m) {
             fileToBuffer(m_nfp, makeFileName(m_dir, ft.filename), &ft.filedata,
                          ft.checksum);
 
-        // Request the check and update status
-        Packet msg =
+        // Request the file check, then update status
+        Packet check_msg =
             Packet().ofCheckIsNecessary(f_id, ft.filename, ft.checksum);
-        if (m->send_one(msg)) {
+        Packet response;
+        if (m->send_one(check_msg)) {
             ft.status = COMPLETED;
-            ft.deleteFileData();
-            msg = Packet().ofKeepIt(f_id);
-            m->send_one(msg);
+            response = Packet().ofKeepIt(f_id);
         } else {
             ft.status = LOCALONLY;
-            // msg = Packet().ofDeleteIt(f_id);
-            // m->send_one(msg);
+            response = Packet().ofDeleteIt(f_id);
         }
+        m->send_one(response);
 
         ft.deleteFileData();
     }
@@ -124,15 +126,6 @@ bool ClientManager::endToEndCheck(Messenger *m) {
         if (ft.status != COMPLETED) return false;
     }
     return true;
-}
-
-void ClientManager::transfer(Messenger *m) {
-    assert(m);
-
-    c150debug->printf(C150APPLICATION, "Starting transfer\n");
-
-    while (!(sendFiles(m)))  // && endToEndCheck(m)))
-        c150debug->printf(C150APPLICATION, "RE-Starting transfer\n");
 }
 
 ClientManager::FileTracker::FileTracker() {

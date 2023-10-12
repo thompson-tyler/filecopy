@@ -19,7 +19,7 @@ Messenger::Messenger(C150DgmSocket *sock) {
     c150debug->printf(C150APPLICATION, "Set up manager\n");
 }
 
-Messenger::~Messenger() { delete m_sock; }
+Messenger::~Messenger() {}
 
 bool Messenger::send_one(Packet &message) {
     vector<Packet> msgs(1, message);
@@ -49,6 +49,8 @@ bool Messenger::send(vector<Packet> &messages) {
     c150debug->printf(C150APPLICATION,
                       "Assigned packets and sequences to %d messages\n",
                       npackets);
+
+    cerr << "---- sending " << messages.size() << " messages ----" << endl;
 
     // Try sending batches until all messages are ACK'd or network failure
     // TODO: could also try making this smarter, maybe we detect a stall

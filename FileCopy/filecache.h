@@ -54,9 +54,14 @@ class Filecache {
         seq_t seqno;
         std::string filename;
         std::vector<FileSegment> sections;
+        void deleteSections();
     };
 
     uint32_t joinBuffers(vector<FileSegment> fs, uint8_t **buffer);
+
+    // Takes the id of a completed cache entry and saves it to disk as a tmp
+    // file. Frees the sections in the cache entry and sets the status to TMP.
+    void partialToTemp(int id);
 
     /*
      * filename -> ( FileStatus, min seq for redo, [ section1, NULL, ... ])

@@ -39,4 +39,7 @@ bool isFile(string fname);
 string makeFileName(string dir, string name);
 string makeTmpFileName(string dir, string name);
 
+int fileToBufferNaive(C150NETWORK::NASTYFILE *nfp, string srcfile,
+                      uint8_t **buffer_pp);
+
 #endif

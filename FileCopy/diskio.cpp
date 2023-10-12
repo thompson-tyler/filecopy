@@ -18,6 +18,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #define SHA_LEN SHA_DIGEST_LENGTH
@@ -30,7 +31,6 @@ using namespace C150NETWORK;
  */
 
 // what we'd do if there was no nastiness
-int fileToBufferNaive(NASTYFILE *nfp, string srcfile, uint8_t **buffer_pp);
 bool bufferToFileNaive(NASTYFILE *nfp, string srcfile, uint8_t *buffer,
                        uint32_t bufferlen);
 
@@ -57,6 +57,9 @@ int fileToBuffer(NASTYFILE *nfp, string srcfile, uint8_t **buffer_pp,
     return fileToBufferSecure(nfp, srcfile, buffer_pp, checksum);
 }
 
+// returns -1 in disk error
+// guarantees that data writted to disk is correct by trying repeatedly and
+// matching hashcodes
 bool bufferToFile(NASTYFILE *nfp, string srcfile, uint8_t *buffer,
                   uint32_t bufferlen) {
     if (!isFile(srcfile)) {
@@ -70,33 +73,79 @@ bool bufferToFile(NASTYFILE *nfp, string srcfile, uint8_t *buffer,
 // needs to have 2 flawless of MAX_DISK_RETRIES reads
 int fileToBufferSecure(NASTYFILE *nfp, string srcfile, uint8_t **buffer_pp,
                        unsigned char checksumOut[SHA_LEN]) {
-    assert(*buffer_pp == nullptr && checksumOut);
-    unsigned char checksums[MAX_DISK_RETRIES][SHA_LEN] = {0};
-    for (int i = 0; i < MAX_DISK_RETRIES; i++) {  // for each try
+    assert((buffer_pp == nullptr || *buffer_pp == nullptr) && checksumOut);
+
+    int high_count = 0;
+    uint8_t *high_buffer = nullptr;
+    checksum_t high_checksum;
+    int high_buflen = 0;
+    unordered_map<string, int> checksums;
+    for (int i = 0; i < HASH_SAMPLES; i++) {
         uint8_t *buffer = nullptr;
+        checksum_t checksum;
+
         int buflen = fileToBufferNaive(nfp, srcfile, &buffer);
         assert(buffer);
         if (buflen == -1) return -1;
+        SHA1(buffer, buflen, checksum);
 
-        SHA1(buffer, buflen, checksums[i]);
-        for (int j = 0; j < i; j++) {  // for each past checksum
-            if (memcmp(checksums[j], checksums[i], SHA_LEN) == 0) {
-                *buffer_pp = buffer;
-                if (checksumOut) memcpy(checksumOut, checksums[i], SHA_LEN);
-                return buflen;
-            }
+        string checksumStr((char *)checksum, SHA_LEN);
+        if (checksums.count(checksumStr)) {
+            checksums[checksumStr]++;
+        } else {
+            checksums[checksumStr] = 1;
         }
 
-        if (1 < i)
-            c150debug->printf(C150APPLICATION,
-                              "failed read of %s for %ith time\n",
-                              srcfile.c_str(), i);
-
-        free(buffer);  // bad buffer
+        if (checksums[checksumStr] > high_count) {
+            high_count = checksums[checksumStr];
+            if (high_buffer) free(high_buffer);
+            high_buffer = buffer;
+            memcpy(high_checksum, checksum, SHA_LEN);
+            high_buflen = buflen;
+        } else {
+            free(buffer);
+        }
     }
 
+    if (buffer_pp) {
+        *buffer_pp = high_buffer;
+    } else {
+        free(high_buffer);
+    }
+    if (checksumOut) memcpy(checksumOut, high_checksum, SHA_LEN);
+    return high_buflen;
+
+    // unsigned char checksums[MAX_DISK_RETRIES][SHA_LEN] = {0};
+    // for (int i = 0; i < MAX_DISK_RETRIES; i++) {  // for each try
+    //     uint8_t *buffer = nullptr;
+    //     int buflen = fileToBufferNaive(nfp, srcfile, &buffer);
+    //     assert(buffer);
+    //     if (buflen == -1) return -1;
+
+    //     SHA1(buffer, buflen, checksums[i]);
+    //     int matching = 0;
+    //     for (int j = 0; j < i; j++) {  // for each past checksum
+    //         if (memcmp(checksums[j], checksums[i], SHA_LEN) == 0) {
+    //             matching++;
+    //         }
+    //         // Require HASH_MATCHES matches to be sure
+    //         if (matching >= HASH_MATCHES) {
+    //             if (buffer_pp) *buffer_pp = buffer;
+    //             if (checksumOut) memcpy(checksumOut, checksums[i],
+    //             SHA_LEN); return buflen;
+    //         }
+    //     }
+
+    //     if (i > 1)
+    //         c150debug->printf(C150APPLICATION,
+    //                           "failed read of %s for %ith time\n",
+    //                           srcfile.c_str(), i);
+
+    //     free(buffer);  // bad buffer
+    // }
+
     fprintf(stderr,
-            "Disk failure -- unable to reliably open file %s in %i attempts\n",
+            "Disk failure -- unable to reliably open file %s in %d attempts\n",
             srcfile.c_str(), MAX_DISK_RETRIES);
     return -1;
 }
@@ -112,7 +161,7 @@ int fileToBufferNaive(NASTYFILE *nfp, string srcfile, uint8_t **buffer_pp) {
         return -1;
     }
 
-    uint8_t *buffer = (uint8_t *)malloc(statbuf.st_size + 1);
+    uint8_t *buffer = (uint8_t *)malloc(statbuf.st_size);
     assert(buffer);
 
     // so file does exist -- but something else is wrong, just kill process
@@ -133,7 +182,6 @@ int fileToBufferNaive(NASTYFILE *nfp, string srcfile, uint8_t **buffer_pp) {
         exit(EXIT_FAILURE);
     }
 
-    buffer[len] = 0;
     *buffer_pp = buffer;
     return len;
 }
@@ -162,7 +210,7 @@ bool bufferToFileSecure(NASTYFILE *nfp, string srcfile, uint8_t *buffer,
     }
 
     fprintf(stderr,
-            "Disk failure -- unable to reliably open file %s in %i attempts\n",
+            "Disk failure -- unable to reliably open file %s in %d attempts\n",
             srcfile.c_str(), MAX_DISK_RETRIES);
     return -1;
 }

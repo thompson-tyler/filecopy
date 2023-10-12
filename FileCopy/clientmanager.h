@@ -22,6 +22,7 @@ class ClientManager {
    public:
     // loads all files from dir
     ClientManager(C150NastyFile *nfp, string dir, vector<string> *filenames);
+    ~ClientManager();
 
     void transfer(Messenger *m);
 

@@ -50,6 +50,7 @@ bool Filecache::idempotentCheckfile(int id, seq_t seqno, const string filename,
     // If we haven't heard of this ID, try to perform the check on the filename
     // anyway. This is kind of a hack that lets us verify pre-existing files.
     if (!m_cache.count(id)) {
+        cerr << "got filecheck for unknown id " << id << endl;
         vector<FileSegment> nosegments;
         // cache if success (note we check the actual file not .tmp)
         if (filecheck(makeFileName(m_dir, filename), checksum)) {
@@ -64,21 +65,31 @@ bool Filecache::idempotentCheckfile(int id, seq_t seqno, const string filename,
     }
 
     auto &entry = m_cache[id];
+    cerr << "doing check for " << entry.filename << endl;
     switch (entry.status) {
         case FileStatus::PARTIAL:  // something is wrong
+            cerr << "failed to check file " << filename
+                 << " because it has not finished transferring" << endl;
             return SOS;
         case FileStatus::TMP:
             // We have already done the check, but it is still in TMP,
             // Instead, if it's an old message the client can figure it out
-            if (seqno <= entry.seqno) return SOS;
+            if (seqno <= entry.seqno) {
+                cerr << "failed to check file " << filename
+                     << " because it has an old seq number" << endl;
+                return SOS;
+            }
 
             // During TMP, seqno is always the most recent filecheck, or when
             // file was finished
             entry.seqno = seqno;
 
             // check the .tmp file
-            if (!filecheck(makeTmpFileName(m_dir, filename), checksum))
+            if (!filecheck(makeTmpFileName(m_dir, filename), checksum)) {
+                cerr << "failed to check file " << filename
+                     << " because checksums didn't match" << endl;
                 return SOS;
+            }
             entry.status = FileStatus::VERIFIED;  // check success
             return ACK;
         default:  // if already verified or saved
@@ -88,7 +99,7 @@ bool Filecache::idempotentCheckfile(int id, seq_t seqno, const string filename,
 
 bool Filecache::idempotentSaveFile(int id, seq_t seqno) {
     if (!m_cache.count(id)) return SOS;
-    auto &entry = m_cache[id];
+    CacheEntry &entry = m_cache[id];
     switch (entry.status) {
         case FileStatus::VERIFIED:
             rename(makeTmpFileName(m_dir, m_cache[id].filename).c_str(),
@@ -105,19 +116,14 @@ bool Filecache::idempotentSaveFile(int id, seq_t seqno) {
 
 bool Filecache::idempotentDeleteTmp(int id, seq_t seqno) {
     if (!m_cache.count(id)) return SOS;
-
-    auto &entry = m_cache[id];
+    CacheEntry &entry = m_cache[id];
     switch (entry.status) {
         case FileStatus::PARTIAL:
             return ACK;
         case FileStatus::TMP:
             remove(makeTmpFileName(m_dir, m_cache[id].filename).c_str());
             entry.seqno = seqno;
-            for (auto &section : entry.sections) {
-                free(section.data);
-                section.data = nullptr;
-                section.len = 0;
-            }
+            entry.deleteSections();
             entry.status = FileStatus::PARTIAL;
             return ACK;
         case FileStatus::VERIFIED:
@@ -136,31 +142,25 @@ bool Filecache::idempotentPrepareForFile(int id, seq_t seqno,
     // 1. It doesn't already exist
     // OR
     // 2. The status is PARTIAL and a **NEW** message tells us to start over
-    if (!m_cache.count(id) || (m_cache[id].seqno < seqno &&
-                               m_cache[id].status == FileStatus::PARTIAL)) {
+    if (!m_cache.count(id) || m_cache[id].seqno < seqno) {
         c150debug->printf(C150APPLICATION,
                           "preparing for file %s, id %d with %d parts.\n",
                           filename.c_str(), id, nparts);
+        // free any old date in the event this is a retransmission
+        m_cache[id].deleteSections();
+        // Build a new file cache entry
         vector<FileSegment> sections(nparts);
-        // set current seqno
         CacheEntry entry = {FileStatus::PARTIAL, seqno, filename, sections};
         m_cache[id] = entry;
-        for (auto &section : m_cache[id].sections) {
-            free(section.data);
-            section.data = nullptr;
-            section.len = 0;
-        }
     }
     return ACK;
 }
 
 bool Filecache::idempotentStoreFileChunk(int id, seq_t seqno, uint32_t partno,
                                          uint8_t *data, uint32_t len) {
-    if (!m_cache.count(id)) {
-        return SOS;
-    }
+    if (!m_cache.count(id)) return SOS;
 
-    auto &entry = m_cache[id];
+    CacheEntry &entry = m_cache[id];
     if (entry.status == FileStatus::PARTIAL) {
         c150debug->printf(
             C150APPLICATION,
@@ -179,20 +179,9 @@ bool Filecache::idempotentStoreFileChunk(int id, seq_t seqno, uint32_t partno,
             if (section.data == nullptr) return ACK;
 
         // if no sections are null, move to TMP
-        entry.status = FileStatus::TMP;
-        uint8_t *buffer = nullptr;
-        uint32_t buflen = joinBuffers(m_cache[id].sections, &buffer);
-
-        // no data segments can still be nullptr
-        for (FileSegment &section : m_cache[id].sections) {
-            free(section.data);
-            section.data = nullptr;
-        }
-
-        string tmpfile = makeTmpFileName(m_dir, m_cache[id].filename);
-        touch(m_nfp, tmpfile);
-        bufferToFile(m_nfp, tmpfile, buffer, buflen);
-        free(buffer);
+        partialToTemp(id);
+        entry.seqno = seqno;  // for TMP entries, seqno is the most recent
+                              // filecheck or when file was finished
     }
     return ACK;
 }
@@ -211,4 +200,28 @@ uint32_t Filecache::joinBuffers(vector<FileSegment> fs, uint8_t **buffer_pp) {
 
     *buffer_pp = buffer;
     return sumlen;
+}
+
+void Filecache::partialToTemp(int id) {
+    CacheEntry &entry = m_cache[id];
+    entry.status = FileStatus::TMP;
+
+    // Move section data to a buffer
+    uint8_t *buffer = nullptr;
+    uint32_t buflen = joinBuffers(m_cache[id].sections, &buffer);
+    m_cache[id].deleteSections();
+
+    // Move buffer to a tmp file
+    string tmpfile = makeTmpFileName(m_dir, m_cache[id].filename);
+    touch(m_nfp, tmpfile);
+    bufferToFile(m_nfp, tmpfile, buffer, buflen);
+    free(buffer);
+}
+
+void Filecache::CacheEntry::deleteSections() {
+    for (auto &section : sections) {
+        free(section.data);
+        section.data = nullptr;
+        section.len = 0;
+    }
 }

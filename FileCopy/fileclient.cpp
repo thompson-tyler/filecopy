@@ -66,6 +66,7 @@ int main(int argc, char **argv) {
         // skip subdirectories
         filenames.push_back(string(sourceFile->d_name));
     }
+    closedir(src);
 
     ClientManager manager(nfp, string(srcdir), &filenames);
     Messenger messenger(sock);
@@ -84,5 +85,5 @@ int main(int argc, char **argv) {
     } catch (C150Exception &e) {
         cerr << "fileclient: Caught C150Exception: " << e.formattedExplanation()
              << endl;
-    }
+    };
 }
