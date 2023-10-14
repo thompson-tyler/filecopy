@@ -5,15 +5,26 @@
 #include "c150grading.h"
 #include "c150nastydgmsocket.h"
 #include "c150nastyfile.h"
+#include "cache.h"
 #include "responder.h"
 #include "utils.h"
 
 using namespace C150NETWORK;
 
+void listen(C150NastyDgmSocket *sock, files_t *files, cache_t *cache) {
+    packet_t p;
+    while (true) {
+        int len = sock->read((char *)&p, MAX_PACKET_SIZE);
+        if (p.hdr.len != len) continue;
+        bounce(files, cache, &p);
+        sock->write((char *)&p, p.hdr.len);
+    }
+}
+
 int main(int argc, char **argv) {
     // TODO: uncomment
     // GRADEME(argc, argv);
-    setUpDebugLogging("serverlog.txt", argc, argv);
+    setup_logging("serverlog.txt", argc, argv);
 
     if (argc != 4) {
         fprintf(stderr,

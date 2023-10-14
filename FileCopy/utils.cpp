@@ -1,5 +1,7 @@
 #include "utils.h"
 
+#include <cassert>
+#include <cstdlib>
 #include <fstream>
 
 #include "c150debug.h"
@@ -7,7 +9,27 @@
 using namespace C150NETWORK;
 using namespace std;
 
-void setUpDebugLogging(const char *logname, int argc, char *argv[]) {
+// TODO
+
+bool check_directory(const char *dirname) {
+    assert(dirname);
+    assert(0);
+    return false;
+}
+
+bool is_files(const char *filename) {
+    assert(filename);
+    assert(0);
+    return false;
+}
+
+bool touch(const char *filename) {
+    assert(filename);
+    assert(0);
+    return false;
+}
+
+void setup_loggin(const char *logname, int argc, char *argv[]) {
     //
     //           Choose where debug output should go
     //

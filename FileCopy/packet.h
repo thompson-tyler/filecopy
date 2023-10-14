@@ -4,6 +4,7 @@
 #include <openssl/sha.h>
 
 #include "c150dgmsocket.h"
+#include "files.h"
 #include "settings.h"
 
 typedef int seq_t;
@@ -11,10 +12,10 @@ typedef int fid_t;
 
 // All message types, doesn't discriminate on origin of client vs server
 // clang-format off
-enum MessageType {
-    // these don't have to be bit flags, but why not?
+enum messagetype_e {
+    // These don't have to be bit flags, but why not?
     // Original idea was that ACK and SOS preserve 
-    // their original messages.
+    // their incoming messages.
     //
     // For now no funny business, just used as normal enum.
     SOS                = 0b10000000, 
@@ -27,63 +28,61 @@ enum MessageType {
 };
 // clang-format on
 
+typedef union payload_t payload_u;
+
 struct Header {
     // minimum size of whole packet
-    u_int32_t len;
+    int len;
     MessageType type;
     seq_t seqno = -1;
-    fid_t fid;
+    fid_t id;
 };
 
 const int MAX_PACKET_SIZE = C150NETWORK::MAXDGMSIZE;
 const int MAX_PAYLOAD_SIZE = C150NETWORK::MAXDGMSIZE - sizeof(Header);
 
-struct CheckIsNecessary {
+struct check_is_neccesary_t {
     unsigned char checksum[SHA_DIGEST_LENGTH];
     char filename[MAX_FILENAME_LENGTH];
 };
 
-struct PrepareForBlob {
+struct prepare_for_blob_t {
     char filename[MAX_FILENAME_LENGTH];
-    uint32_t nparts;
+    int nparts;
 };
 
-struct BlobSection {
-    uint32_t partno;
-    uint8_t data[MAX_PAYLOAD_SIZE - sizeof(partno)];
+struct blob_section_t {
+    int partno;
+    int start;
+    uint8_t data[MAX_PAYLOAD_SIZE - sizeof(partno) - sizeof(start)];
 };
 
-union Payload {
-    CheckIsNecessary check;
-    PrepareForBlob prep;
-    BlobSection section;
+union payload_t {
+    check_is_neccesary_t check;
+    prepare_for_blob_t prep;
+    blob_section_t section;
 };
 
-struct Packet {
+struct packet_t {
     Header hdr;
-    Payload value;
+    payload_t value;
 
-    // message constructors
-
-    /* client side */
-    Packet ofCheckIsNecessary(int id, std::string filename,
-                              unsigned char checksum[SHA_DIGEST_LENGTH]);
-    Packet ofKeepIt(int id);
-    Packet ofDeleteIt(int id);
-    Packet ofPrepareForBlob(int id, std::string filename, uint32_t nparts);
-    Packet ofBlobSection(int id, uint32_t partno, uint32_t size,
-                         const uint8_t *data);
-    /* server side */
-    Packet intoAck();
-    Packet intoSOS();
-
-    /* */
+    /* blob section data length */
     int datalen();
 
     // for debugging
-    std::string toString();
+    std::string tostring();
 };
 
-typedef Packet Message;
+/* constructors */
+void packet_ack(packet_t *p);
+void packet_sos(packet_t *p);
+void packet_checkisnecessary(packet_t *p, fid_t id, const char *filename,
+                             const checksum_t checksum);
+void packet_keepit(packet_t *p, fid_t id);
+void packet_deleteit(packet_t *p, fid_t id);
+void packet_prepare(packet_t *p, fid_t id, char *filename, uint32_t nparts);
+void packet_section(packet_t *p, fid_t id, uint32_t partno, uint32_t offset,
+                    uint32_t size, const uint8_t *data);
 
 #endif

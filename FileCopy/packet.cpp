@@ -9,80 +9,82 @@
 
 using namespace std;
 
-/* client side */
-Packet Packet::ofCheckIsNecessary(int id, std::string filename,
-                                  unsigned char checksum[SHA_DIGEST_LENGTH]) {
-    hdr.fid = id;
-    hdr.type = CHECK_IS_NECESSARY;
-    hdr.len = sizeof(hdr) + sizeof(value.check);
+// /* client side */
+// Packet Packet::ofCheckIsNecessary(int id, std::string filename,
+//                                   unsigned char checksum[SHA_DIGEST_LENGTH])
+//                                   {
+//     hdr.fid = id;
+//     hdr.type = CHECK_IS_NECESSARY;
+//     hdr.len = sizeof(hdr) + sizeof(value.check);
+//
+//     assert(filename.length() < MAX_FILENAME_LENGTH);
+//     memset(&value.check, 0, sizeof(value.check));
+//
+//     memcpy(value.check.filename, filename.c_str(), filename.length());
+//     memcpy(value.check.checksum, checksum, SHA_DIGEST_LENGTH);
+//
+//     return *this;
+// }
+//
+// Packet Packet::ofKeepIt(int id) {
+//     hdr.len = sizeof(hdr);
+//     hdr.fid = id;
+//     hdr.type = KEEP_IT;
+//     return *this;
+// }
+//
+// Packet Packet::ofDeleteIt(int id) {
+//     hdr.len = sizeof(hdr);
+//     hdr.fid = id;
+//     hdr.type = DELETE_IT;
+//     return *this;
+// }
+//
+// Packet Packet::ofPrepareForBlob(int id, std::string filename, uint32_t
+// nparts) {
+//     hdr.fid = id;
+//     hdr.type = PREPARE_FOR_BLOB;
+//     hdr.len = sizeof(hdr) + sizeof(value.prep);
+//
+//     assert(filename.length() < MAX_FILENAME_LENGTH);
+//     memset(&value.prep, 0, sizeof(value.prep));
+//
+//     memcpy(value.prep.filename, filename.c_str(), filename.length());
+//     value.prep.nparts = nparts;
+//     return *this;
+// }
+//
+// Packet Packet::ofBlobSection(int id, uint32_t partno, uint32_t size,
+//                              const uint8_t *data) {
+//     hdr.fid = id;
+//     hdr.type = BLOB_SECTION;
+//     hdr.len = sizeof(hdr) + sizeof(value.section.partno) + size;
+//
+//     assert(hdr.len <= MAX_PACKET_SIZE);
+//     memset(&value.section, 0, sizeof(value.section));
+//
+//     value.section.partno = partno;
+//     memcpy(value.section.data, data, size);
+//     return *this;
+// }
+//
+// /* server side */
+// Packet Packet::intoAck() {
+//     hdr.type = ACK;
+//     return *this;
+// }
+//
+// Packet Packet::intoSOS() {
+//     hdr.type = SOS;
+//     return *this;
+// }
 
-    assert(filename.length() < MAX_FILENAME_LENGTH);
-    memset(&value.check, 0, sizeof(value.check));
-
-    memcpy(value.check.filename, filename.c_str(), filename.length());
-    memcpy(value.check.checksum, checksum, SHA_DIGEST_LENGTH);
-
-    return *this;
-}
-
-Packet Packet::ofKeepIt(int id) {
-    hdr.len = sizeof(hdr);
-    hdr.fid = id;
-    hdr.type = KEEP_IT;
-    return *this;
-}
-
-Packet Packet::ofDeleteIt(int id) {
-    hdr.len = sizeof(hdr);
-    hdr.fid = id;
-    hdr.type = DELETE_IT;
-    return *this;
-}
-
-Packet Packet::ofPrepareForBlob(int id, std::string filename, uint32_t nparts) {
-    hdr.fid = id;
-    hdr.type = PREPARE_FOR_BLOB;
-    hdr.len = sizeof(hdr) + sizeof(value.prep);
-
-    assert(filename.length() < MAX_FILENAME_LENGTH);
-    memset(&value.prep, 0, sizeof(value.prep));
-
-    memcpy(value.prep.filename, filename.c_str(), filename.length());
-    value.prep.nparts = nparts;
-    return *this;
-}
-
-Packet Packet::ofBlobSection(int id, uint32_t partno, uint32_t size,
-                             const uint8_t *data) {
-    hdr.fid = id;
-    hdr.type = BLOB_SECTION;
-    hdr.len = sizeof(hdr) + sizeof(value.section.partno) + size;
-
-    assert(hdr.len <= MAX_PACKET_SIZE);
-    memset(&value.section, 0, sizeof(value.section));
-
-    value.section.partno = partno;
-    memcpy(value.section.data, data, size);
-    return *this;
-}
-
-/* server side */
-Packet Packet::intoAck() {
-    hdr.type = ACK;
-    return *this;
-}
-
-Packet Packet::intoSOS() {
-    hdr.type = SOS;
-    return *this;
-}
-
-int Packet::datalen() {
+int packet_t::datalen() {
     assert(hdr.type == BLOB_SECTION);
     return hdr.len - (sizeof(hdr) + sizeof(value.section.partno));
 }
 
-string Packet::toString() {
+string packet_t::tostring() {
     stringstream ss;
     ss << "---------------\n";
     ss << "Packet\n";

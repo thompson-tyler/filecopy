@@ -1,152 +1,112 @@
+
 #include "messenger.h"
 
-#include <cassert>
-#include <unordered_map>
-#include <vector>
+#include <assert.h>
+#include <stdbool.h>
+#include <stdlib.h>
 
 #include "c150debug.h"
 #include "c150network.h"
+#include "files.h"
 #include "packet.h"
+#include "settings.h"
 
-using namespace C150NETWORK;
-using namespace std;
+// TODO: factor in nastiness
 
-Messenger::Messenger(C150DgmSocket *sock) {
-    m_sock = sock;
-    m_sock->turnOnTimeouts(MESSENGER_TIMEOUT);
-    m_seqno = 0;
-
-    c150debug->printf(C150APPLICATION, "Set up manager\n");
+bool made_progress(int prev, int curr, int nastiness) {
+    (void)nastiness;
+    return prev > curr;  // bare minimum
 }
 
-Messenger::~Messenger() {}
-
-bool Messenger::send_one(Packet &message) {
-    vector<Packet> msgs(1, message);
-    return send(msgs);
+bool throttle(int nel, int nastiness) {
+    (void)nastiness;
+    return nel;
 }
 
-// returns true if successful
-bool Messenger::send(vector<Packet> &messages) {
-    Packet *packets = messages.data();
-    int npackets = messages.size();
-    // seq number of the "youngest" message in this group
-    seq_t minseq = m_seqno;
+bool messenger_send(messenger_t *m, packet_t *packets, int n_packets) {
+    // sanity checks
+    assert(m && packets);
+    if (n_packets == 0) return true;
 
-    // Build map of messages to send and SOS's files
-    m_seqmap.clear();
-
-    c150debug->printf(C150APPLICATION,
-                      "Try to send %d messages, beginning with seqno %u\n",
-                      npackets, m_seqno);
-
-    for (int i = 0; i < npackets; i++) {
-        packets[i].hdr.seqno = m_seqno;
-        m_seqmap[m_seqno] = &packets[i];
-        m_seqno++;
+    // initialize packets and seqmap
+    packet_t **seqmap = (packet_t **)malloc(sizeof(&packets) * n_packets);
+    int minseqno = m->global_seqcount;
+    for (int i = 0; i < n_packets; i++) {
+        packets[i].hdr.seqno = m->global_seqcount++;
+        seqmap[packets[i].hdr.seqno % n_packets] = &packets[i];
     }
 
-    c150debug->printf(C150APPLICATION,
-                      "Assigned packets and sequences to %d messages\n",
-                      npackets);
-
-    cerr << "---- sending " << messages.size() << " messages ----" << endl;
-
-    // Try sending batches until all messages are ACK'd or network failure
-    // TODO: could also try making this smarter, maybe we detect a stall
-    // mathematically
-    for (int send_fails = 0; send_fails < MAX_RESEND_ATTEMPTS;) {
-        // all messages were ACK'd!
-        if (m_seqmap.size() == 0) {
-            c150debug->printf(C150APPLICATION,
-                              "Completed send of %d messages\n",
-                              messages.size());
-            return true;
+    packet_t p;
+    int unanswered = n_packets;
+    int max_group = throttle(MAX_SEND_GROUP, m->nastiness);
+    for (int resends = MAX_RESEND_ATTEMPTS; resends > 0; resends--) {
+        // send group of unanswered packets
+        for (int i = 0, sent = 0; i < n_packets && sent < max_group; i++) {
+            if (seqmap[i] == nullptr) continue;
+            m->sock->write((char *)seqmap[i], seqmap[i]->hdr.len);
+            sent++;
         }
 
-        // Send all un-ACK'd messages
-        int throttle = 0;
-        for (auto &kv_pair : m_seqmap) {
-            Packet *p = kv_pair.second;
-            m_sock->write((const char *)p, p->hdr.len);
-            // c150debug->printf(C150APPLICATION, "Sent packet!\n%s\n",
-            //                   p->toString().c_str());
-            if (++throttle == MAX_SEND_GROUP)
-                break;  // don't send too many at a time
-        }
+        int unanswered_prev = unanswered;
 
-        c150debug->printf(C150APPLICATION, "Sent %d un-ACK'd messages\n",
-                          m_seqmap.size());
-
-        // Read loop - wait for ACKs and remove from resend queue
-        int num_acked = 0;
-        while (true) {
-            Packet p;
-            ssize_t len = m_sock->read((char *)&p, MAX_PACKET_SIZE);
-            if (m_sock->timedout()) break;
-            if (len != p.hdr.len) {
-                c150debug->printf(
-                    C150APPLICATION,
-                    "Received a packet with length %lu but expected "
-                    "length was %d\n",
-                    len, p.hdr.len);
-                continue;
-            }
-
-            // Inspect packet
-            if (p.hdr.seqno < minseq) continue;
-            if (p.hdr.type == ACK) {
-                if (m_seqmap.find(p.hdr.seqno) == m_seqmap.end()) continue;
-                m_seqmap.erase(p.hdr.seqno);
-                num_acked++;
-            } else if (p.hdr.type == SOS)  // Something went wrong
+        while (!m->sock->timedout() && unanswered) {  // read all incoming
+            int len = m->sock->read((char *)&p, MAX_PACKET_SIZE);
+            if (len != p.hdr.len || p.hdr.seqno < minseqno) continue;
+            if (p.hdr.type == SOS && seqmap[p.hdr.seqno % n_packets]) {
+                free(seqmap);
                 return false;
+            } else if (p.hdr.type == ACK && seqmap[p.hdr.seqno % n_packets]) {
+                seqmap[p.hdr.seqno % n_packets] = nullptr;
+                unanswered--;
+            }
         }
 
-        if (num_acked == 0) send_fails++;
-
-        c150debug->printf(C150APPLICATION,
-                          "Send round complete, sent %d messages, received %d "
-                          "ACKs, resending %d un-ACK'd messages\n",
-                          throttle, num_acked, m_seqmap.size());
-        cerr << "Send round complete, sent " << throttle << " messages, "
-             << "received " << num_acked << " ACKs, " << m_seqmap.size()
-             << " messages remaining\n";
+        if (unanswered == 0) {
+            free(seqmap);
+            return true;
+        } else if (made_progress(unanswered_prev, unanswered, m->nastiness))
+            resends = MAX_RESEND_ATTEMPTS;  // earned more slack
     }
 
-    c150debug->printf(C150APPLICATION,
-                      "Failed to send %d messages after %d attempts\n",
-                      messages.size(), MAX_RESEND_ATTEMPTS);
-    return false;
+    throw C150NETWORK::C150NetworkException(
+        "Network failed after many resend attempts");
 }
 
-bool Messenger::sendBlob(string blob, int blobid, string blobName) {
-    vector<Packet> sectionMessages = partitionBlob(blob, blobid);
-    Packet prepMessage =
-        Packet().ofPrepareForBlob(blobid, blobName, sectionMessages.size());
-    return (send_one(prepMessage) && send(sectionMessages));
-}
-
-vector<Packet> Messenger::partitionBlob(string blob, int blobid) {
-    vector<Packet> messages;
-    size_t pos = 0;
-    uint32_t partno = 0;
-
-    Packet m;
-    while (pos < blob.size()) {
-        string data_string = blob.substr(pos, sizeof(m.value.section.data));
-        // c150debug->printf(C150APPLICATION,
-        //                   "partitioning id %i partno %i of length %u\n",
-        //                   blobid, partno, data_string.length());
-        pos += data_string.length();
-        m.ofBlobSection(blobid, partno++, data_string.length(),
-                        (uint8_t *)data_string.c_str());
-        messages.push_back(m);
+void transfer(files_t *fs, messenger_t *m) {
+    int n_files = fs->n_files;
+    int attempts = 0;
+    for (int id = 0; id < n_files; id++) {
+        if (filesend(fs, id, m) && end2end(fs, id, m))
+            attempts = 0;  // onto the next one
+        else if (attempts >= MAX_SOS_COUNT)
+            throw C150NETWORK::C150NetworkException(
+                "Failed file transfer after MAX SOS COUNT");
+        else {  // OR retry
+            id--;
+            attempts++;
+        }
     }
+}
 
-    c150debug->printf(C150APPLICATION,
-                      "finished partitioning into %u messages\n",
-                      messages.size());
+bool end2end(files_t *fs, int id, messenger_t *m) {
+    packet_t p;
+    checksum_t checksum;
+    files_calc_checksum(fs, id, checksum);
+    packet_checkisnecessary(&p, id, fs->files[id].filename, checksum);
+    bool endtoend = messenger_send(m, &p, 1);
+    if (endtoend)
+        packet_keepit(&p, id);
+    else
+        packet_deleteit(&p, id);
+    return messenger_send(m, &p, 1);
+}
 
-    return messages;
+bool filesend(files_t *fs, int id, messenger_t *m) {
+    packet_t prep_out;
+    packet_t *sections_out;
+    int npackets = files_topackets(fs, id, &prep_out, &sections_out);
+    bool success = messenger_send(m, &prep_out, 1) &&
+                   messenger_send(m, sections_out, npackets);
+    free(sections_out);
+    return success;
 }

@@ -11,35 +11,24 @@
 #include "packet.h"
 #include "settings.h"
 
-class Messenger {
-   public:
-    Messenger(C150NETWORK::C150DgmSocket *sock);
-    ~Messenger();
+/* UDP wrapper */
 
-    // Sends a message and makes sure it is acknowledged.
-    // Returns true if successful, aborts and returns false if SOS (TODO: make
-    // sure this is what we want).
-    bool send_one(Packet &message);
-    bool send(vector<Packet> &messages);
-
-    // 1. Creates and sends client Message of PREPARE_FOR_BLOB and waits
-    // until it's acknowledged.
-    // 2. Then splits blob into sections and sends them, making sure all are
-    // acknowledged
-    //
-    // Returns true if successful, aborts and returns false if SOS
-    // (TODO: make sure this is what we want).
-    bool sendBlob(std::string blob, int blobid, std::string blobName);
-
-   private:
-    std::vector<Packet> partitionBlob(string blob, int blobid);
-
-    std::string read();
-
-    C150NETWORK::C150DgmSocket *m_sock;
-    seq_t m_seqno;
-
-    unordered_map<seq_t, Packet *> m_seqmap;
+struct messenger_t {
+    C150NETWORK::C150NastyDgmSocket *sock;
+    int nastiness;
+    int global_seqcount;
 };
+
+/* safe UDP send and recv */
+
+// false if recv SOS : true if recv ACK
+bool messenger_send(messenger_t *m, packet_t *packets, int n_packets);
+
+/* high level filecopy code */
+
+void transfer(files_t *fs, messenger_t *m);
+
+bool end2end(files_t *fs, int id, messenger_t *m);
+bool filesend(files_t *fs, int id, messenger_t *m);
 
 #endif
