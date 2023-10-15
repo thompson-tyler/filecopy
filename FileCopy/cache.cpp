@@ -1,5 +1,7 @@
 #include "cache.h"
 
+#include <alloca.h>
+
 #include <cstdio>
 #include <cstdlib>
 
@@ -55,6 +57,8 @@ struct entry_t {
     bool verified;
 };
 
+// these settings are important and relied on elsewhere
+// be careful before modifying
 void entry_init(entry_t *e) {
     assert(e);
     e->seqno = -1;
@@ -75,6 +79,11 @@ cache_t *cache_new() {
     return c;
 }
 
+void cache_loaddir(files_t *fs, cache_t *cache) {
+    cache->nel = fs->n_files;
+    for (int i = 0; i < cache->nel; i++) entry_init(&cache->entries[i]);
+}
+
 void cache_free(cache_t **cache_pp) {
     assert(cache_pp && *cache_pp);
     cache_t *c = *cache_pp;
@@ -83,8 +92,9 @@ void cache_free(cache_t **cache_pp) {
     *cache_pp = nullptr;
 }
 
-void cache_resize_if_necessary(cache_t *cache, int id) {
-    if (cache->cap < id) {  // add new space for ids
+void cache_insert_if_necessary(cache_t *cache, int id) {
+    cache->nel = max(cache->nel, id + 1);
+    while (cache->cap <= id) {  // add new space for ids
         int newcap = cache->cap / 2;
         cache->entries = (entry_t *)realloc(cache->entries,
                                             sizeof(*cache->entries) * newcap);
@@ -98,12 +108,13 @@ void cache_resize_if_necessary(cache_t *cache, int id) {
 bool idempotent_prepareforfile(files_t *fs, cache_t *cache, fid_t id,
                                seq_t seqno, int n_parts, const char *filename) {
     assert(fs && cache);
-    cache_resize_if_necessary(cache, id);
+    cache_insert_if_necessary(cache, id);
     if (cache->entries[id].seqno > seqno) return SOS;
     if (cache->entries[id].seqno == seqno) return ACK;
 
     // got a new prepare!!
     files_register(fs, id, filename);
+
     // realloc in case we've already tried
     cache->entries[id].recvparts =
         (bool *)realloc(cache->entries[id].recvparts, sizeof(bool) * n_parts);
@@ -120,7 +131,7 @@ bool idempotent_storesection(files_t *fs, cache_t *cache, fid_t id, seq_t seqno,
                              const char *data) {
     assert(fs && cache);
     if (id > cache->nel || cache->entries[id].seqno > seqno ||
-        partno >= cache->entries[id].n_parts)
+        partno >= cache->entries[id].n_parts || !cache->entries[id].recvparts)
         return SOS;
 
     // already got it!
@@ -135,9 +146,15 @@ bool idempotent_checkfile(files_t *fs, cache_t *cache, fid_t id, seq_t seqno,
                           const char *filename,
                           const unsigned char *checksum_in) {
     assert(fs && cache);
-    if (id > cache->nel || cache->entries[id].seqno > seqno) return SOS;
+    cache_insert_if_necessary(cache, id);
 
-    // SOS if missing parts
+    // for files in the directory that never received a prepare msg
+    if (id > cache->nel || cache->entries[id].seqno == -1)
+        files_register(fs, id, filename);
+    else if (cache->entries[id].seqno > seqno)
+        return SOS;
+
+    // SOS if missing parts, skipped for new files
     for (int i = 0; i < cache->entries[id].n_parts; i++)
         if (!cache->entries[id].recvparts[i]) return SOS;
 
@@ -148,7 +165,8 @@ bool idempotent_checkfile(files_t *fs, cache_t *cache, fid_t id, seq_t seqno,
     // do check
     cache->entries[id].verified = files_checktmp(fs, id, checksum_in);
 
-    // new seqno means we know the answer of end2end check
+    // new seqno means we know the answer of end2end
+    // check
     cache->entries[id].seqno = seqno;
     return cache->entries[id].verified ? ACK : SOS;
 }

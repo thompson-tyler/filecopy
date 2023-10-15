@@ -29,7 +29,7 @@ bool touch(const char *filename) {
     return false;
 }
 
-void setup_loggin(const char *logname, int argc, char *argv[]) {
+void setup_logging(const char *logname, int argc, char *argv[]) {
     //
     //           Choose where debug output should go
     //

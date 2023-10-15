@@ -11,7 +11,7 @@
 
 using namespace C150NETWORK;
 
-void listen(C150NastyDgmSocket *sock, files_t *files, cache_t *cache) {
+void listen(C150DgmSocket *sock, files_t *files, cache_t *cache) {
     packet_t p;
     while (true) {
         int len = sock->read((char *)&p, MAX_PACKET_SIZE);
@@ -47,12 +47,19 @@ int main(int argc, char **argv) {
 
     // Set up file socket
     C150NastyFile *nfp = new C150NastyFile(file_nastiness);
+    files_t fs = {
+        .nfp = nfp,
+        .nastiness = file_nastiness,
+        .n_files = 0,
+        .files = nullptr,
+    };
+    cache_t *cache = cache_new();
 
     c150debug->printf(C150APPLICATION, "Set up file handler nastiness %d\n",
                       file_nastiness);
 
     try {
-        listen(sock, nfp, string(targetdir));
+        listen(sock, &fs, cache);
     } catch (C150NetworkException &e) {
         // Write to debug log
         c150debug->printf(C150ALWAYSLOG, "Caught C150NetworkException: %s\n",
@@ -62,4 +69,8 @@ int main(int argc, char **argv) {
              << ": caught C150NetworkException: " << e.formattedExplanation()
              << endl;
     }
+
+    cache_free(&cache);
+    files_free(&fs);
+    delete sock;
 }

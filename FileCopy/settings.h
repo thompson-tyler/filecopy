@@ -6,6 +6,9 @@
 #define HASH_MATCHES 10
 #define HASH_SAMPLES 200
 
+/* only do end to end check */
+// #define JUST_END_TO_END
+
 // Messenger settings
 #define MESSENGER_TIMEOUT 1000
 #define MAX_RESEND_ATTEMPTS 10

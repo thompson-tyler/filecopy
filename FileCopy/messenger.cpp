@@ -11,32 +11,42 @@
 #include "packet.h"
 #include "settings.h"
 
-// TODO: factor in nastiness
+using namespace C150NETWORK;
 
+bool end2end(files_t *fs, int id, messenger_t *m);
+bool filesend(files_t *fs, int id, messenger_t *m);
+
+// TODO: factor in nastiness
 bool made_progress(int prev, int curr, int nastiness) {
     (void)nastiness;
     return prev > curr;  // bare minimum
 }
 
+// TODO: factor in nastiness
 bool throttle(int nel, int nastiness) {
     (void)nastiness;
     return nel;
 }
 
-bool messenger_send(messenger_t *m, packet_t *packets, int n_packets) {
-    // sanity checks
-    assert(m && packets);
-    if (n_packets == 0) return true;
-
-    // initialize packets and seqmap
+packet_t **assign_sequences(messenger_t *m, packet_t *packets, int n_packets) {
     packet_t **seqmap = (packet_t **)malloc(sizeof(&packets) * n_packets);
-    int minseqno = m->global_seqcount;
     for (int i = 0; i < n_packets; i++) {
         packets[i].hdr.seqno = m->global_seqcount++;
         seqmap[packets[i].hdr.seqno % n_packets] = &packets[i];
     }
+    return seqmap;
+}
 
+bool send(messenger_t *m, packet_t *packets, int n_packets) {
+    // sanity checks
+    assert(m && packets);
+    if (n_packets == 0) return true;
+
+    // initialize tmp packets and seqmap
+    int minseqno = m->global_seqcount;
+    packet_t **seqmap = assign_sequences(m, packets, n_packets);
     packet_t p;
+
     int unanswered = n_packets;
     int max_group = throttle(MAX_SEND_GROUP, m->nastiness);
     for (int resends = MAX_RESEND_ATTEMPTS; resends > 0; resends--) {
@@ -48,7 +58,6 @@ bool messenger_send(messenger_t *m, packet_t *packets, int n_packets) {
         }
 
         int unanswered_prev = unanswered;
-
         while (!m->sock->timedout() && unanswered) {  // read all incoming
             int len = m->sock->read((char *)&p, MAX_PACKET_SIZE);
             if (len != p.hdr.len || p.hdr.seqno < minseqno) continue;
@@ -68,23 +77,24 @@ bool messenger_send(messenger_t *m, packet_t *packets, int n_packets) {
             resends = MAX_RESEND_ATTEMPTS;  // earned more slack
     }
 
-    throw C150NETWORK::C150NetworkException(
-        "Network failed after many resend attempts");
+    free(seqmap);
+    throw C150NetworkException("Network after MAX_RESEND_ATTEMPTS");
 }
 
 void transfer(files_t *fs, messenger_t *m) {
     int n_files = fs->n_files;
     int attempts = 0;
-    for (int id = 0; id < n_files; id++) {
-        if (filesend(fs, id, m) && end2end(fs, id, m))
+    for (int id = 0; id < n_files; attempts++) {  // <== NOT id++
+        if (
+#ifndef JUST_END_TO_END
+            filesend(fs, id, m) &&
+#endif
+            end2end(fs, id, m)) {
             attempts = 0;  // onto the next one
-        else if (attempts >= MAX_SOS_COUNT)
+            id++;
+        } else if (attempts >= MAX_SOS_COUNT)
             throw C150NETWORK::C150NetworkException(
                 "Failed file transfer after MAX SOS COUNT");
-        else {  // OR retry
-            id--;
-            attempts++;
-        }
     }
 }
 
@@ -93,20 +103,19 @@ bool end2end(files_t *fs, int id, messenger_t *m) {
     checksum_t checksum;
     files_calc_checksum(fs, id, checksum);
     packet_checkisnecessary(&p, id, fs->files[id].filename, checksum);
-    bool endtoend = messenger_send(m, &p, 1);
+    bool endtoend = send(m, &p, 1);
     if (endtoend)
         packet_keepit(&p, id);
     else
         packet_deleteit(&p, id);
-    return messenger_send(m, &p, 1);
+    return send(m, &p, 1);
 }
 
 bool filesend(files_t *fs, int id, messenger_t *m) {
     packet_t prep_out;
     packet_t *sections_out;
     int npackets = files_topackets(fs, id, &prep_out, &sections_out);
-    bool success = messenger_send(m, &prep_out, 1) &&
-                   messenger_send(m, sections_out, npackets);
+    bool success = send(m, &prep_out, 1) && send(m, sections_out, npackets);
     free(sections_out);
     return success;
 }

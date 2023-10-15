@@ -14,7 +14,7 @@
 /* UDP wrapper */
 
 struct messenger_t {
-    C150NETWORK::C150NastyDgmSocket *sock;
+    C150NETWORK::C150DgmSocket *sock;
     int nastiness;
     int global_seqcount;
 };
@@ -22,13 +22,10 @@ struct messenger_t {
 /* safe UDP send and recv */
 
 // false if recv SOS : true if recv ACK
-bool messenger_send(messenger_t *m, packet_t *packets, int n_packets);
+bool send(messenger_t *m, packet_t *packets, int n_packets);
 
 /* high level filecopy code */
 
 void transfer(files_t *fs, messenger_t *m);
-
-bool end2end(files_t *fs, int id, messenger_t *m);
-bool filesend(files_t *fs, int id, messenger_t *m);
 
 #endif

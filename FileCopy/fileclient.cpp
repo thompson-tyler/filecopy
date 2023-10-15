@@ -9,8 +9,8 @@
 #include "c150nastydgmsocket.h"
 #include "c150nastyfile.h"
 #include "c150utility.h"
-#include "clientmanager.h"
-#include "diskio.h"
+#include "files.h"
+#include "messenger.h"
 #include "settings.h"
 #include "utils.h"
 
@@ -47,7 +47,6 @@ int main(int argc, char **argv) {
     cerr << "Set up socket and file handler" << endl;
 
     // Get list of files to send
-    vector<string> filenames;
     DIR *src = opendir(srcdir);
     struct dirent *sourceFile;  // Directory entry for source file
 
@@ -66,24 +65,19 @@ int main(int argc, char **argv) {
         // skip subdirectories
         filenames.push_back(string(sourceFile->d_name));
     }
+
     closedir(src);
 
-    ClientManager manager(nfp, string(srcdir), &filenames);
-    Messenger messenger(sock);
+    messenger_t messenger = {sock, network_nastiness, 0};
+    files_t *fs = files_register_fromdir(srcdir, nfp, file_nastiness);
 
     try {
-        bool check_success = false;
-        while (!check_success) {
-            // Send files
-            manager.transfer(&messenger);
-            cerr << "File transfer complete, starting e2e" << endl;
-
-            check_success = manager.endToEndCheck(&messenger);
-            cerr << "End to end check " << (check_success ? "passed" : "failed")
-                 << endl;
-        }
+        // Send files
+        transfer(fs, &messenger);
     } catch (C150Exception &e) {
         cerr << "fileclient: Caught C150Exception: " << e.formattedExplanation()
              << endl;
     };
+
+    files_free(fs);
 }

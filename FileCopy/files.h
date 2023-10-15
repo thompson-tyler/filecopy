@@ -22,8 +22,8 @@ struct files_t {
 };
 
 // allocates and populates all fields
-files_t *files_fromdir(char *dirname, C150NETWORK::C150NastyFile *nfp,
-                       int nastiness);
+files_t *files_register_fromdir(char *dirname, C150NETWORK::C150NastyFile *nfp,
+                                int nastiness);
 
 // add a file and it's metadata to the filebuffer
 void files_register(files_t *fs, int id, const char *filename);
@@ -37,13 +37,13 @@ void files_free(files_t *files);
 // guaranteed safe!
 //
 // loads from NON-tmp file
-int files_load(files_t *fs, int id, int start, int nbytes, void **buffer_out);
+int files_load(files_t *fs, int id, int offset, int nbytes, void **buffer_out);
 
 // buffer_in != nullptr && 0 <= start <= end <= length
 // guaranteed safe!
 //
 // stores in TMP file
-void files_storetmp(files_t *fs, int id, int start, int nbytes,
+void files_storetmp(files_t *fs, int id, int offset, int nbytes,
                     const void *buffer_in);
 bool files_checktmp(files_t *fs, int id, const checksum_t checksum_in);
 
