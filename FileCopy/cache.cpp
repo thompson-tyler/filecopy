@@ -87,7 +87,7 @@ void cache_free(cache_t **cache_pp) {
     *cache_pp = nullptr;
 }
 
-void cache_insert_if_necessary(cache_t *cache, int id) {
+void cache_add_id_if_necessary(cache_t *cache, int id) {
     cache->nel = max(cache->nel, id + 1);
     while (cache->cap <= id) {  // add new space for ids
         int newcap = cache->cap / 2;
@@ -103,7 +103,7 @@ void cache_insert_if_necessary(cache_t *cache, int id) {
 bool idempotent_prepareforfile(files_t *fs, cache_t *cache, fid_t id,
                                seq_t seqno, int n_parts, const char *filename) {
     assert(fs && cache);
-    cache_insert_if_necessary(cache, id);
+    cache_add_id_if_necessary(cache, id);
     if (cache->entries[id].seqno > seqno) return SOS;
     if (cache->entries[id].seqno == seqno) return ACK;
 
@@ -141,7 +141,7 @@ bool idempotent_checkfile(files_t *fs, cache_t *cache, fid_t id, seq_t seqno,
                           const char *filename,
                           const unsigned char *checksum_in) {
     assert(fs && cache);
-    cache_insert_if_necessary(cache, id);
+    cache_add_id_if_necessary(cache, id);
 
     // for files in the directory that never received a prepare msg
     if (id > cache->nel || cache->entries[id].seqno == -1)

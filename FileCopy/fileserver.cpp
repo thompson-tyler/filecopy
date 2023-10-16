@@ -1,4 +1,6 @@
 
+#include <assert.h>
+
 #include <cstdio>
 
 #include "c150debug.h"
@@ -6,6 +8,7 @@
 #include "c150nastydgmsocket.h"
 #include "c150nastyfile.h"
 #include "cache.h"
+#include "settings.h"
 #include "utils.h"
 
 using namespace C150NETWORK;
@@ -47,10 +50,12 @@ int main(int argc, char **argv) {
     // Set up file socket
     C150NastyFile *nfp = new C150NastyFile(file_nastiness);
 
+    // setup the file handler
     files_t fs;
     fs.nfp = nfp;
     fs.nastiness = file_nastiness;
-    fs.dirname = targetdir;
+    assert(strnlen(targetdir, MAX_DIRNAME_LENGTH) < MAX_DIRNAME_LENGTH);
+    strncpy(fs.dirname, targetdir, MAX_DIRNAME_LENGTH);
 
     cache_t *cache = cache_new();
 

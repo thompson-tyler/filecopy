@@ -26,13 +26,13 @@ int fmemread_secure(C150NastyFile *nfp, const int nastiness,
 
 int fmemread_naive(NASTYFILE *nfp, uint8_t **buffer_pp, int offset, int nbytes);
 
-int length(const char *filename);
-
 void files_register_fromdir(files_t *fs, char *dirname, C150NastyFile *nfp,
                             int nastiness) {
     assert(fs && dirname && nfp && 0 <= nastiness && nastiness <= 5);
 
-    fs->dirname = dirname;
+    assert(strnlen(dirname, MAX_DIRNAME_LENGTH) < MAX_DIRNAME_LENGTH);
+    strncpy(fs->dirname, dirname, MAX_DIRNAME_LENGTH);
+
     fs->nfp = nfp;
     fs->nastiness = nastiness;
 
@@ -76,15 +76,11 @@ int files_topackets(files_t *fs, int id, packet_t *prep_out,
     checksum_t checksum;
 
     // read the file
-    assert(strnlen(fs->dirname, MAX_DIRNAME_LENGTH) > MAX_DIRNAME_LENGTH);
-
-    // open file
-    char fullname[MAX_DIRNAME_LENGTH + MAX_FILENAME_LENGTH];
+    char fullname[FULLNAME];
     mkfullname(fullname, fs->dirname, filename);
     assert(fs->nfp->fopen(fullname, "rb"));
 
-    int len = fmemread_secure(fs->nfp, fs->nastiness, &buffer, 0,
-                              length(fullname), checksum);
+    int len = fmemread_secure(fs->nfp, fs->nastiness, &buffer, 0, -1, checksum);
     fs->nfp->fclose();
     if (len == -1) {
         fprintf(stderr, "critical failure parsing %s\n", filename);
@@ -157,8 +153,7 @@ bool files_checktmp(files_t *fs, int id, const checksum_t checksum_in) {
     char fullname[FULLNAME];
     mkfullname(fullname, fs->dirname, tmpname);
     assert(fs->nfp->fopen(fullname, "rb"));
-    int len = fmemread_secure(fs->nfp, fs->nastiness, &buffer, 0,
-                              length(fullname), checksum);
+    int len = fmemread_secure(fs->nfp, fs->nastiness, &buffer, 0, -1, checksum);
     fs->nfp->fclose();
     free(buffer);
     return len != -1 && memcmp(checksum, checksum_in, SHA_LEN) == 0;
@@ -189,6 +184,14 @@ int fmemread_secure(C150NastyFile *nfp, const int nastiness,
                     unsigned char checksum_out[]) {
     assert(buffer_pp && *buffer_pp == nullptr);
     assert(checksum_out);
+
+    if (offset == 0 && nbytes == -1) {
+        nfp->fseek(0, SEEK_END);
+        nbytes = nfp->ftell();
+        nfp->fseek(0, SEEK_SET);
+    }
+
+    assert(offset >= 0 && nbytes > 0);
 
     auto checksums = new unsigned char[MAX_DISK_RETRIES + nastiness][SHA_LEN];
     for (int i = 0; i < MAX_DISK_RETRIES + nastiness; i++) {  // for each try
@@ -236,10 +239,4 @@ int fmemread_naive(NASTYFILE *nfp, uint8_t **buffer_pp, int offset,
 
     *buffer_pp = buffer;
     return len;
-}
-
-int length(const char *filename) {
-    struct stat statbuf;
-    assert(lstat(filename, &statbuf) == 0);
-    return statbuf.st_size;
 }

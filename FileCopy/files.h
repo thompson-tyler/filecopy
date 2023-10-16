@@ -21,7 +21,7 @@ struct file_entry_t {
 struct files_t {
     C150NETWORK::C150NastyFile *nfp = nullptr;
     int nastiness = 0;
-    char *dirname;
+    char dirname[MAX_DIRNAME_LENGTH];
     unordered_map<int, file_entry_t> files;
 };
 
