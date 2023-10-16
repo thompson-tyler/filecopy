@@ -40,6 +40,7 @@ int main(int argc, char **argv) {
     // Set up socket
     C150DgmSocket *sock = new C150NastyDgmSocket(network_nastiness);
     sock->setServerName(server_name);
+    sock->turnOnTimeouts(2000);
 
     // Set up file handler
     C150NastyFile *nfp = new C150NastyFile(file_nastiness);
@@ -53,6 +54,7 @@ int main(int argc, char **argv) {
 
     try {
         // Send files
+        errp("starting transfer\n");
         transfer(&fs, &messenger);
     } catch (C150Exception &e) {
         cerr << "fileclient: Caught C150Exception: " << e.formattedExplanation()

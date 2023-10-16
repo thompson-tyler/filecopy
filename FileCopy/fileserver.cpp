@@ -17,7 +17,7 @@ void listen(C150DgmSocket *sock, files_t *files, cache_t *cache) {
     packet_t p;
     while (true) {
         int len = sock->read((char *)&p, MAX_PACKET_SIZE);
-        if (p.hdr.len != len) continue;
+        if (len <= 0 || p.hdr.len != len || p.hdr.seqno < 0) continue;
         bounce(files, cache, &p);
         sock->write((char *)&p, p.hdr.len);
     }
@@ -42,6 +42,7 @@ int main(int argc, char **argv) {
 
     // Set up socket
     C150DgmSocket *sock = new C150NastyDgmSocket(network_nastiness);
+    sock->turnOnTimeouts(2000);
 
     c150debug->printf(C150APPLICATION,
                       "Set up server socket with nastiness %d\n",
@@ -50,7 +51,7 @@ int main(int argc, char **argv) {
     // Set up file socket
     C150NastyFile *nfp = new C150NastyFile(file_nastiness);
 
-    // setup the file handler
+    // setup the file collection
     files_t fs;
     fs.nfp = nfp;
     fs.nastiness = file_nastiness;

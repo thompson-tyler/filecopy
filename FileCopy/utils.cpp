@@ -32,17 +32,18 @@ bool is_file(const char *filename) {
     assert(filename);
     struct stat statbuf;
     if (lstat(filename, &statbuf) != 0) {
-        fprintf(stderr, "isFile: Error stating supplied source file %s\n",
+        fprintf(stderr, "is file: Error stating supplied source file %s\n",
                 filename);
         return false;
     }
 
     if (!S_ISREG(statbuf.st_mode)) {
-        fprintf(stderr, "isFile: %s exists but is not a regular file\n",
+        fprintf(stderr, "is file: %s exists but is not a regular file\n",
                 filename);
         return false;
     }
-    return false;
+
+    return true;
 }
 
 void setup_logging(const char *logname, int argc, char *argv[]) {

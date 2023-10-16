@@ -132,8 +132,9 @@ void packet_section(packet_t *p, fid_t id, uint32_t partno, uint32_t offset,
 
 int packet_t::datalen() {
     assert(hdr.type == BLOB_SECTION);
-    // p->hdr.len = sizeof(p->hdr) + sizeof(p->value.section) -
-    //              sizeof(p->value.section.data) + size;
+    /*
+     * len = sizeof hdr + sizeof section + size - sizeof data
+     */
     return hdr.len - sizeof(hdr) - sizeof(value.section) +
            sizeof(value.section.data);
 }

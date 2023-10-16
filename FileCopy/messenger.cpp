@@ -40,7 +40,7 @@ packet_t **assign_sequences(messenger_t *m, packet_t *packets, int n_packets) {
 bool send(messenger_t *m, packet_t *packets, int n_packets) {
     // sanity checks
     assert(m && packets);
-    if (n_packets == 0) return true;
+    assert(n_packets > 0);
 
     // initialize tmp packets and seqmap
     int minseqno = m->global_seqcount;

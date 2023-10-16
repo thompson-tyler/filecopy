@@ -30,7 +30,7 @@ void files_register_fromdir(files_t *fs, char *dirname,
                             C150NETWORK::C150NastyFile *nfp, int nastiness);
 
 // add a file and it's metadata to the filebuffer
-bool files_register(files_t *fs, int id, const char *filename);
+bool files_register(files_t *fs, int id, const char *filename, bool touch);
 
 // returns nel of packets in sections_out
 int files_topackets(files_t *fs, int id, packet_t *prep_out,

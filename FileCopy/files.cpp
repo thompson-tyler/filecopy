@@ -23,8 +23,12 @@ using namespace C150NETWORK;
 int fmemread_secure(C150NastyFile *nfp, const int nastiness,
                     uint8_t **buffer_pp, int offset, int nbytes,
                     unsigned char checksum_out[]);
-
 int fmemread_naive(NASTYFILE *nfp, uint8_t **buffer_pp, int offset, int nbytes);
+void mkfullname(char *dst, const char *dirname, const char *fname) {
+    assert(dst && dirname && fname);
+    strncpy(dst, dirname, MAX_DIRNAME_LENGTH);
+    strncat(dst, fname, MAX_FILENAME_LENGTH);
+}
 
 void files_register_fromdir(files_t *fs, char *dirname, C150NastyFile *nfp,
                             int nastiness) {
@@ -47,30 +51,29 @@ void files_register_fromdir(files_t *fs, char *dirname, C150NastyFile *nfp,
             continue;  // never copy . or ..
         assert(strnlen(file->d_name, MAX_FILENAME_LENGTH) <
                MAX_FILENAME_LENGTH);
-        files_register(fs, id, file->d_name);
+        files_register(fs, id, file->d_name, false);
         id++;
     }
 
     closedir(src);
 }
 
-bool files_register(files_t *fs, int id, const char *filename) {
-    if (!is_file(filename)) return false;
+bool files_register(files_t *fs, int id, const char *filename, bool allow_new) {
+    char fullname[FULLNAME];
+    mkfullname(fullname, fs->dirname, filename);
+    errp("tryna REGISTERED FILE: %s\n", fullname);
+    if (!allow_new && !is_file(fullname)) return false;
+    errp("REGISTERED FILE: %s as %s with id %d\n", fullname,
+         fs->files[id].filename, id);
     strncpy(fs->files[id].filename, filename, MAX_FILENAME_LENGTH);
     return true;
-}
-
-void mkfullname(char *dst, const char *dirname, const char *fname) {
-    assert(dst && dirname && fname);
-    strncpy(dst, dirname, MAX_DIRNAME_LENGTH);
-    strncat(dst, fname, MAX_FILENAME_LENGTH);
 }
 
 int files_topackets(files_t *fs, int id, packet_t *prep_out,
                     packet_t **sections_out, packet_t *check_out) {
     assert(fs && prep_out && sections_out && check_out);
     const char *filename = fs->files[id].filename;
-    assert(filename && is_file(filename));
+    assert(filename);
 
     uint8_t *buffer = nullptr;
     checksum_t checksum;
@@ -78,6 +81,7 @@ int files_topackets(files_t *fs, int id, packet_t *prep_out,
     // read the file
     char fullname[FULLNAME];
     mkfullname(fullname, fs->dirname, filename);
+    assert(is_file(fullname));
     assert(fs->nfp->fopen(fullname, "rb"));
 
     int len = fmemread_secure(fs->nfp, fs->nastiness, &buffer, 0, -1, checksum);
@@ -125,7 +129,7 @@ void files_storetmp(files_t *fs, int id, int offset, int nbytes,
     // file open
     char tmpname[FULLNAME];
     mkfullname(tmpname, fs->dirname, mktmpname(fs->files[id].filename));
-    assert(fs->nfp->fopen(tmpname, "rb"));
+    assert(fs->nfp->fopen(tmpname, "w+b"));
 
     SHA1((unsigned char *)buffer_in, nbytes, checksum_in);
     uint8_t *buffer = nullptr;
@@ -230,11 +234,14 @@ int fmemread_naive(NASTYFILE *nfp, uint8_t **buffer_pp, int offset,
     assert(*buffer_pp == nullptr);
     verify(nbytes > 0 && offset >= 0);
 
+    errp("attempt naive read %d bytes at %ld\n", nbytes, nfp->ftell());
+
     uint8_t *buffer = (uint8_t *)malloc(nbytes);
     assert(buffer);
 
     nfp->fseek(offset, SEEK_SET);
     int len = nfp->fread(buffer, 1, nbytes);
+    errp("completed read %d bytes now at %ld\n", len, nfp->ftell());
     assert(len == nbytes);
 
     *buffer_pp = buffer;

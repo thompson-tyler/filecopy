@@ -108,7 +108,7 @@ bool idempotent_prepareforfile(files_t *fs, cache_t *cache, fid_t id,
     if (cache->entries[id].seqno == seqno) return ACK;
 
     // got a new prepare!!
-    files_register(fs, id, filename);
+    files_register(fs, id, filename, true);
 
     // realloc in case we've already tried
     cache->entries[id].recvparts =
@@ -145,7 +145,7 @@ bool idempotent_checkfile(files_t *fs, cache_t *cache, fid_t id, seq_t seqno,
 
     // for files in the directory that never received a prepare msg
     if (id > cache->nel || cache->entries[id].seqno == -1)
-        files_register(fs, id, filename);
+        files_register(fs, id, filename, false);
     else if (cache->entries[id].seqno > seqno)
         return SOS;
 
