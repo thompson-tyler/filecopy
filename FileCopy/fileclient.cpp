@@ -19,7 +19,7 @@ using namespace std;
 
 int main(int argc, char **argv) {
     // GRADEME(argc, argv);
-    setUpDebugLogging("clientlog.txt", argc, argv);
+    setup_logging("clientlog.txt", argc, argv);
 
     if (argc != 5) {
         fprintf(
@@ -35,7 +35,7 @@ int main(int argc, char **argv) {
     int file_nastiness = atoi(argv[3]);
     char *srcdir = argv[4];
 
-    checkDirectory(argv[4]);
+    check_directory(argv[4]);
 
     // Set up socket
     C150DgmSocket *sock = new C150NastyDgmSocket(network_nastiness);
@@ -45,28 +45,6 @@ int main(int argc, char **argv) {
     C150NastyFile *nfp = new C150NastyFile(file_nastiness);
 
     cerr << "Set up socket and file handler" << endl;
-
-    // Get list of files to send
-    DIR *src = opendir(srcdir);
-    struct dirent *sourceFile;  // Directory entry for source file
-
-    if (src == NULL) {
-        fprintf(stderr, "Error opening source directory %s\n", argv[2]);
-        exit(8);
-    }
-
-    while ((sourceFile = readdir(src)) != NULL) {
-        // skip the . and .. names
-        if ((strcmp(sourceFile->d_name, ".") == 0) ||
-            (strcmp(sourceFile->d_name, "..") == 0))
-            continue;  // never copy . or ..
-
-        // do the copy -- this will check for and
-        // skip subdirectories
-        filenames.push_back(string(sourceFile->d_name));
-    }
-
-    closedir(src);
 
     messenger_t messenger = {sock, network_nastiness, 0};
     files_t *fs = files_register_fromdir(srcdir, nfp, file_nastiness);
