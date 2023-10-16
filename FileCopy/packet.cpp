@@ -79,9 +79,63 @@ using namespace std;
 //     return *this;
 // }
 
+void packet_ack(packet_t *p) {
+    p->hdr.type = ACK;
+    p->hdr.len = sizeof(p->hdr);
+}
+
+void packet_sos(packet_t *p) {
+    p->hdr.type = SOS;
+    p->hdr.len = sizeof(p->hdr);
+}
+
+void packet_checkisnecessary(packet_t *p, fid_t id, const char *filename,
+                             const checksum_t checksum) {
+    p->hdr.type = CHECK_IS_NECESSARY;
+    p->hdr.len = sizeof(p->hdr) + sizeof(p->value.check);
+    p->hdr.id = id;
+    strncpy(p->value.check.filename, filename, MAX_FILENAME_LENGTH);
+    memcpy(p->value.check.checksum, checksum, SHA_DIGEST_LENGTH);
+}
+
+void packet_keepit(packet_t *p, fid_t id) {
+    p->hdr.type = KEEP_IT;
+    p->hdr.len = sizeof(p->hdr);
+    p->hdr.id = id;
+}
+
+void packet_deleteit(packet_t *p, fid_t id) {
+    p->hdr.type = DELETE_IT;
+    p->hdr.len = sizeof(p->hdr);
+    p->hdr.id = id;
+}
+
+void packet_prepare(packet_t *p, fid_t id, const char *filename,
+                    uint32_t nparts) {
+    p->hdr.type = PREPARE_FOR_BLOB;
+    p->hdr.len = sizeof(p->hdr) + sizeof(p->value.prep);
+    p->hdr.id = id;
+    p->value.prep.nparts = nparts;
+    strncpy(p->value.prep.filename, filename, MAX_FILENAME_LENGTH);
+}
+
+void packet_section(packet_t *p, fid_t id, uint32_t partno, uint32_t offset,
+                    uint32_t size, const uint8_t *data) {
+    p->hdr.type = BLOB_SECTION;
+    p->hdr.len = sizeof(p->hdr) + sizeof(p->value.section) -
+                 (sizeof(p->value.section.data) - size);
+    p->hdr.id = id;
+    p->value.section.partno = partno;
+    p->value.section.start = offset;
+    memcpy(p->value.section.data, data, size);
+}
+
 int packet_t::datalen() {
     assert(hdr.type == BLOB_SECTION);
-    return hdr.len - (sizeof(hdr) + sizeof(value.section.partno));
+    // p->hdr.len = sizeof(p->hdr) + sizeof(p->value.section) -
+    //              sizeof(p->value.section.data) + size;
+    return hdr.len - sizeof(hdr) - sizeof(value.section) +
+           sizeof(value.section.data);
 }
 
 string packet_t::tostring() {

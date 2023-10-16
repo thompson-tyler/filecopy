@@ -28,32 +28,28 @@ int fmemread_naive(NASTYFILE *nfp, const char *file, uint8_t **buffer_pp,
 
 int length(const char *filename);
 
-files_t files_register_fromdir(char *dirname, C150NastyFile *nfp,
-                               int nastiness) {
-    files_t fs;
-    fs.nfp = nfp;
-    fs.nastiness = nastiness;
+void files_register_fromdir(files_t *fs, char *dirname, C150NastyFile *nfp,
+                            int nastiness) {
+    assert(dirname && nfp && 0 <= nastiness && nastiness <= 5);
+
+    fs->nfp = nfp;
+    fs->nastiness = nastiness;
 
     DIR *src = opendir(dirname);
-    struct dirent *file;  // Directory entry for source file
-    if (src == NULL) {
-        fprintf(stderr, "Error opening source directory %s\n", dirname);
-        exit(8);
-    }
+    assert(src);
 
+    struct dirent *file;  // Directory entry for source file
     int id = 0;
     while ((file = readdir(src)) != NULL) {
         if ((strcmp(file->d_name, ".") == 0) ||
             (strcmp(file->d_name, "..") == 0))
             continue;  // never copy . or ..
         assert(file->d_namlen < MAX_FILENAME_LENGTH);
-        if (files_register(&fs, id, file->d_name))
-            fs.files[id].lenght = file->d_reclen;
+        files_register(fs, id, file->d_name);
         id++;
     }
-    closedir(src);
 
-    return fs;
+    closedir(src);
 }
 
 bool files_register(files_t *fs, int id, const char *filename) {
@@ -64,9 +60,9 @@ bool files_register(files_t *fs, int id, const char *filename) {
 
 int files_topackets(files_t *fs, int id, packet_t *prep_out,
                     packet_t **sections_out, packet_t *check_out) {
+    assert(fs && prep_out && sections_out && check_out);
     const char *filename = fs->files[id].filename;
-    assert(filename);
-    assert(is_file(filename));
+    assert(filename && is_file(filename));
 
     uint8_t *buffer = nullptr;
     checksum_t checksum;
@@ -110,7 +106,8 @@ int files_topackets(files_t *fs, int id, packet_t *prep_out,
 // stores in TMP file
 void files_storetmp(files_t *fs, int id, int offset, int nbytes,
                     const void *buffer_in) {
-    assert(buffer_in);
+    assert(buffer_in && fs);
+    assert(offset >= 0 && nbytes > 0);
 
     const char *filename = mktmpname(fs->files[id].filename);
     checksum_t checksum_in;
@@ -133,7 +130,7 @@ void files_storetmp(files_t *fs, int id, int offset, int nbytes,
         free(buffer);
 
         if (memcmp(checksum_in, checksum_out, SHA_LEN) == 0) break;
-    } while (++attempts);
+    } while (++attempts < MAX_DISK_RETRIES + fs->nastiness);
 
     fs->nfp->fclose();
 }

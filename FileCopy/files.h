@@ -12,9 +12,8 @@
 
 typedef unsigned char checksum_t[SHA_DIGEST_LENGTH];
 
+// trick the c++ compiler into giving full space
 struct file_entry_t {
-    unsigned status = 0;  // undefined structure — depends on application
-    int lenght;
     char filename[MAX_FILENAME_LENGTH] = {0};
 };
 

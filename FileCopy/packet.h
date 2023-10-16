@@ -31,8 +31,8 @@ enum messagetype_e {
 
 struct header_t {
     // minimum size of whole packet
-    int len;
     messagetype_e type;
+    int len;
     seq_t seqno = -1;
     fid_t id;
 };
