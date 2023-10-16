@@ -1,31 +1,47 @@
 #include "utils.h"
 
+#include <sys/stat.h>
+
 #include <cassert>
 #include <cstdlib>
 #include <fstream>
 
 #include "c150debug.h"
+#include "c150nastyfile.h"
 
 using namespace C150NETWORK;
 using namespace std;
 
-// TODO
-
 bool check_directory(const char *dirname) {
     assert(dirname);
-    assert(0);
+    struct stat statbuf;
+    if (lstat(dirname, &statbuf) != 0) {
+        fprintf(stderr, "Error stating supplied source directory %s\n",
+                dirname);
+        exit(8);
+    }
+
+    if (!S_ISDIR(statbuf.st_mode)) {
+        fprintf(stderr, "File %s exists but is not a directory\n", dirname);
+        exit(8);
+    }
     return false;
 }
 
-bool is_files(const char *filename) {
+bool is_file(const char *filename) {
     assert(filename);
-    assert(0);
-    return false;
-}
+    struct stat statbuf;
+    if (lstat(filename, &statbuf) != 0) {
+        fprintf(stderr, "isFile: Error stating supplied source file %s\n",
+                filename);
+        return false;
+    }
 
-bool touch(const char *filename) {
-    assert(filename);
-    assert(0);
+    if (!S_ISREG(statbuf.st_mode)) {
+        fprintf(stderr, "isFile: %s exists but is not a regular file\n",
+                filename);
+        return false;
+    }
     return false;
 }
 
