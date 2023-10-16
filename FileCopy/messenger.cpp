@@ -13,8 +13,8 @@
 
 using namespace C150NETWORK;
 
-bool end2end(files_t *fs, int id, messenger_t *m);
-bool filesend(files_t *fs, int id, messenger_t *m);
+bool filesend(packet_t *prep_out, packet_t *sections_out, messenger_t *m);
+bool end2end(packet_t *check, int id, messenger_t *m);
 
 // TODO: factor in nastiness
 bool made_progress(int prev, int curr, int nastiness) {
@@ -82,14 +82,16 @@ bool send(messenger_t *m, packet_t *packets, int n_packets) {
 }
 
 void transfer(files_t *fs, messenger_t *m) {
-    int n_files = fs->n_files;
+    int n_files = fs->files.size();
     int attempts = 0;
     for (int id = 0; id < n_files; attempts++) {  // <== NOT id++
+        packet_t prep, *sections, check;
+        files_topackets(fs, id, &prep, &sections, &check);
         if (
 #ifndef JUST_END_TO_END
-            filesend(fs, id, m) &&
+            filesend(&prep, sections, m) &&
 #endif
-            end2end(fs, id, m)) {
+            end2end(&check, id, m)) {
             attempts = 0;  // onto the next one
             id++;
         } else if (attempts >= MAX_SOS_COUNT)
@@ -98,12 +100,9 @@ void transfer(files_t *fs, messenger_t *m) {
     }
 }
 
-bool end2end(files_t *fs, int id, messenger_t *m) {
+bool end2end(packet_t *check, int id, messenger_t *m) {
+    bool endtoend = send(m, check, 1);
     packet_t p;
-    checksum_t checksum;
-    files_calc_checksum(fs, id, checksum);
-    packet_checkisnecessary(&p, id, fs->files[id].filename, checksum);
-    bool endtoend = send(m, &p, 1);
     if (endtoend)
         packet_keepit(&p, id);
     else
@@ -111,11 +110,9 @@ bool end2end(files_t *fs, int id, messenger_t *m) {
     return send(m, &p, 1);
 }
 
-bool filesend(files_t *fs, int id, messenger_t *m) {
-    packet_t prep_out;
-    packet_t *sections_out;
-    int npackets = files_topackets(fs, id, &prep_out, &sections_out);
-    bool success = send(m, &prep_out, 1) && send(m, sections_out, npackets);
+bool filesend(packet_t *prep_out, packet_t *sections_out, messenger_t *m) {
+    bool success = send(m, prep_out, 1) &&
+                   send(m, sections_out, prep_out->value.prep.nparts);
     free(sections_out);
     return success;
 }

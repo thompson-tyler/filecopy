@@ -9,6 +9,7 @@
 
 typedef int seq_t;
 typedef int fid_t;
+typedef unsigned char checksum_t[SHA_DIGEST_LENGTH];
 
 // All message types, doesn't discriminate on origin of client vs server
 // clang-format off
@@ -28,18 +29,16 @@ enum messagetype_e {
 };
 // clang-format on
 
-typedef union payload_t payload_u;
-
-struct Header {
+struct header_t {
     // minimum size of whole packet
     int len;
-    MessageType type;
+    messagetype_e type;
     seq_t seqno = -1;
     fid_t id;
 };
 
 const int MAX_PACKET_SIZE = C150NETWORK::MAXDGMSIZE;
-const int MAX_PAYLOAD_SIZE = C150NETWORK::MAXDGMSIZE - sizeof(Header);
+const int MAX_PAYLOAD_SIZE = C150NETWORK::MAXDGMSIZE - sizeof(header_t);
 
 struct check_is_neccesary_t {
     unsigned char checksum[SHA_DIGEST_LENGTH];
@@ -57,15 +56,15 @@ struct blob_section_t {
     uint8_t data[MAX_PAYLOAD_SIZE - sizeof(partno) - sizeof(start)];
 };
 
-union payload_t {
+union payload_u {
     check_is_neccesary_t check;
     prepare_for_blob_t prep;
     blob_section_t section;
 };
 
 struct packet_t {
-    Header hdr;
-    payload_t value;
+    header_t hdr;
+    payload_u value;
 
     /* blob section data length */
     int datalen();
@@ -81,7 +80,8 @@ void packet_checkisnecessary(packet_t *p, fid_t id, const char *filename,
                              const checksum_t checksum);
 void packet_keepit(packet_t *p, fid_t id);
 void packet_deleteit(packet_t *p, fid_t id);
-void packet_prepare(packet_t *p, fid_t id, char *filename, uint32_t nparts);
+void packet_prepare(packet_t *p, fid_t id, const char *filename,
+                    uint32_t nparts);
 void packet_section(packet_t *p, fid_t id, uint32_t partno, uint32_t offset,
                     uint32_t size, const uint8_t *data);
 

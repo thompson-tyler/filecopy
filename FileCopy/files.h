@@ -31,6 +31,10 @@ files_t files_register_fromdir(char *dirname, C150NETWORK::C150NastyFile *nfp,
 // add a file and it's metadata to the filebuffer
 bool files_register(files_t *fs, int id, const char *filename);
 
+// returns nel of packets in sections_out
+int files_topackets(files_t *fs, int id, packet_t *prep_out,
+                    packet_t **sections_out, packet_t *check_is_necessary);
+
 // buffer_in != nullptr && 0 <= start <= end <= length
 // guaranteed safe!
 //
@@ -44,11 +48,5 @@ void files_savepermanent(files_t *fs, int id);
 
 // try delete file and re-initiliaze registry entry
 void files_remove(files_t *fs, int id);
-
-int files_length(files_t *fs, int id);
-
-// returns nel of packets in sections_out
-int files_topackets(files_t *fs, int id, packet_t *prep_out,
-                    packet_t **sections_out, checksum_t checksum_out);
 
 #endif
