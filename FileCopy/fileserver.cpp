@@ -6,7 +6,6 @@
 #include "c150nastydgmsocket.h"
 #include "c150nastyfile.h"
 #include "cache.h"
-#include "responder.h"
 #include "utils.h"
 
 using namespace C150NETWORK;
@@ -47,12 +46,11 @@ int main(int argc, char **argv) {
 
     // Set up file socket
     C150NastyFile *nfp = new C150NastyFile(file_nastiness);
-    files_t fs = {
-        .nfp = nfp,
-        .nastiness = file_nastiness,
-        .n_files = 0,
-        .files = nullptr,
-    };
+
+    files_t fs;
+    fs.nfp = nfp;
+    fs.nastiness = file_nastiness;
+
     cache_t *cache = cache_new();
 
     c150debug->printf(C150APPLICATION, "Set up file handler nastiness %d\n",
@@ -71,6 +69,6 @@ int main(int argc, char **argv) {
     }
 
     cache_free(&cache);
-    files_free(&fs);
     delete sock;
+    delete nfp;
 }

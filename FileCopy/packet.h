@@ -4,7 +4,6 @@
 #include <openssl/sha.h>
 
 #include "c150dgmsocket.h"
-#include "files.h"
 #include "settings.h"
 
 typedef int seq_t;

@@ -1,6 +1,7 @@
 #ifndef FILES_H
 #define FILES_H
 
+#include <assert.h>
 #include <openssl/sha.h>
 
 #include <cstdlib>
@@ -20,12 +21,13 @@ struct file_entry_t {
 struct files_t {
     C150NETWORK::C150NastyFile *nfp = nullptr;
     int nastiness = 0;
-    unordered_map<int, file_entry_t> *files;
+    char *dirname;
+    unordered_map<int, file_entry_t> files;
 };
 
 // allocates and populates all fields
-files_t files_register_fromdir(char *dirname, C150NETWORK::C150NastyFile *nfp,
-                               int nastiness);
+void files_register_fromdir(files_t *fs, char *dirname,
+                            C150NETWORK::C150NastyFile *nfp, int nastiness);
 
 // add a file and it's metadata to the filebuffer
 bool files_register(files_t *fs, int id, const char *filename);

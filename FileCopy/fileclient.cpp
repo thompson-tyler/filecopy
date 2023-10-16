@@ -47,15 +47,18 @@ int main(int argc, char **argv) {
     cerr << "Set up socket and file handler" << endl;
 
     messenger_t messenger = {sock, network_nastiness, 0};
-    files_t *fs = files_register_fromdir(srcdir, nfp, file_nastiness);
+    files_t fs;
+
+    files_register_fromdir(&fs, srcdir, nfp, file_nastiness);
 
     try {
         // Send files
-        transfer(fs, &messenger);
+        transfer(&fs, &messenger);
     } catch (C150Exception &e) {
         cerr << "fileclient: Caught C150Exception: " << e.formattedExplanation()
              << endl;
     };
 
-    files_free(fs);
+    delete sock;
+    delete nfp;
 }

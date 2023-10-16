@@ -43,8 +43,7 @@ C150AR = $(C150LIB)c150ids.a
 LDFLAGS = -lssl -lcrypto
 INCLUDES = $(C150LIB)c150dgmsocket.h $(C150LIB)c150nastydgmsocket.h $(C150LIB)c150network.h $(C150LIB)c150exceptions.h $(C150LIB)c150debug.h $(C150LIB)c150utility.h
 
-OBJ := filecache.o messenger.o responder.o 
-OBJ += packet.o clientmanager.o diskio.o utils.o
+OBJ := cache.o messenger.o packet.o files.o utils.o
 
 TESTS = $(patsubst %.cpp,%,$(wildcard tests/*.cpp))
 

@@ -79,11 +79,6 @@ cache_t *cache_new() {
     return c;
 }
 
-void cache_loaddir(files_t *fs, cache_t *cache) {
-    cache->nel = fs->n_files;
-    for (int i = 0; i < cache->nel; i++) entry_init(&cache->entries[i]);
-}
-
 void cache_free(cache_t **cache_pp) {
     assert(cache_pp && *cache_pp);
     cache_t *c = *cache_pp;
@@ -128,7 +123,7 @@ bool idempotent_prepareforfile(files_t *fs, cache_t *cache, fid_t id,
 
 bool idempotent_storesection(files_t *fs, cache_t *cache, fid_t id, seq_t seqno,
                              int partno, int offset, int len,
-                             const char *data) {
+                             const uint8_t *data) {
     assert(fs && cache);
     if (id > cache->nel || cache->entries[id].seqno > seqno ||
         partno >= cache->entries[id].n_parts || !cache->entries[id].recvparts)
@@ -204,3 +199,6 @@ bool idempotent_deletefile(files_t *fs, cache_t *cache, fid_t id, seq_t seqno) {
     cache->entries[id].seqno = seqno;
     return ACK;
 }
+
+#undef ACK
+#undef SOS

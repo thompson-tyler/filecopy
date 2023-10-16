@@ -142,7 +142,7 @@ string packet_t::tostring() {
     stringstream ss;
     ss << "---------------\n";
     ss << "Packet\n";
-    ss << "Seqno; " << hdr.seqno << " ID: " << hdr.fid << " Len: " << hdr.len
+    ss << "Seqno; " << hdr.seqno << " ID: " << hdr.id << " Len: " << hdr.len
        << endl;
     switch (hdr.type) {
         case SOS:
@@ -188,6 +188,7 @@ string packet_t::tostring() {
             ss << "Type: "
                << "Blob section\n";
             ss << "Section number: " << value.section.partno << endl;
+            ss << "Offset: " << value.section.start << endl;
             break;
     }
     ss << "---------------\n";

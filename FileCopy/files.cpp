@@ -6,7 +6,6 @@
 #include <cstdio>
 #include <cstring>
 
-#include "openssl/sha.h"
 #include "packet.h"
 #include "utils.h"
 
@@ -30,8 +29,9 @@ int length(const char *filename);
 
 void files_register_fromdir(files_t *fs, char *dirname, C150NastyFile *nfp,
                             int nastiness) {
-    assert(dirname && nfp && 0 <= nastiness && nastiness <= 5);
+    assert(fs && dirname && nfp && 0 <= nastiness && nastiness <= 5);
 
+    fs->dirname = dirname;
     fs->nfp = nfp;
     fs->nastiness = nastiness;
 
@@ -44,7 +44,8 @@ void files_register_fromdir(files_t *fs, char *dirname, C150NastyFile *nfp,
         if ((strcmp(file->d_name, ".") == 0) ||
             (strcmp(file->d_name, "..") == 0))
             continue;  // never copy . or ..
-        assert(file->d_namlen < MAX_FILENAME_LENGTH);
+        assert(strnlen(file->d_name, MAX_FILENAME_LENGTH) <
+               MAX_FILENAME_LENGTH);
         files_register(fs, id, file->d_name);
         id++;
     }
@@ -213,7 +214,7 @@ int fmemread_naive(NASTYFILE *nfp, const char *file, uint8_t **buffer_pp,
     assert(buffer);
 
     nfp->fseek(offset, SEEK_SET);
-    uint32_t len = nfp->fread(buffer, 1, nbytes);
+    int len = nfp->fread(buffer, 1, nbytes);
 
     verify(len != nbytes);
 

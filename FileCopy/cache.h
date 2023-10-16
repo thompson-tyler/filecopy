@@ -1,6 +1,7 @@
 #ifndef FILECACHE_H
 #define FILECACHE_H
 
+#include <assert.h>
 #include <openssl/sha.h>
 
 #include <cstdlib>
@@ -34,7 +35,8 @@ bool idempotent_prepareforfile(files_t *fs, cache_t *cache, fid_t id,
 bool idempotent_checkfile(files_t *fs, cache_t *cache, fid_t id, seq_t seqno,
                           const char *filename, const checksum_t checksum);
 bool idempotent_storesection(files_t *fs, cache_t *cache, fid_t id, seq_t seqno,
-                             int partno, int offset, int len, const void *data);
+                             int partno, int offset, int len,
+                             const uint8_t *data);
 bool idempotent_savefile(files_t *fs, cache_t *cache, fid_t id, seq_t seqno);
 bool idempotent_deletefile(files_t *fs, cache_t *cache, fid_t id, seq_t seqno);
 

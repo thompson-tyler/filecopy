@@ -1,6 +1,8 @@
 #ifndef MESSENGER_H
 #define MESSENGER_H
 
+#include <assert.h>
+
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -8,6 +10,7 @@
 #include "c150dgmsocket.h"
 #include "c150grading.h"
 #include "c150nastydgmsocket.h"
+#include "files.h"
 #include "packet.h"
 #include "settings.h"
 
