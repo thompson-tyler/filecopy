@@ -13,6 +13,8 @@ using namespace C150NETWORK;
 
 #define SHA_LEN SHA_DIGEST_LENGTH
 
+#define FULLNAME (MAX_FILENAME_LENGTH + MAX_DIRNAME_LENGTH)
+
 #define mktmpname(fname)                                              \
     (strcat(strncpy((char *)alloca(MAX_FILENAME_LENGTH + 5), (fname), \
                     MAX_FILENAME_LENGTH),                             \
@@ -121,16 +123,13 @@ void files_storetmp(files_t *fs, int id, int offset, int nbytes,
     assert(buffer_in && fs);
     assert(offset >= 0 && nbytes > 0);
 
-    const char *tmpname = mktmpname(fs->files[id].filename);
-    assert(tmpname);
-
     checksum_t checksum_in;
     checksum_t checksum_out;
 
     // file open
-    char fullname[MAX_DIRNAME_LENGTH + MAX_FILENAME_LENGTH];
-    mkfullname(fullname, fs->dirname, tmpname);
-    assert(fs->nfp->fopen(fullname, "rb"));
+    char tmpname[FULLNAME];
+    mkfullname(tmpname, fs->dirname, mktmpname(fs->files[id].filename));
+    assert(fs->nfp->fopen(tmpname, "rb"));
 
     SHA1((unsigned char *)buffer_in, nbytes, checksum_in);
     uint8_t *buffer = nullptr;
@@ -155,9 +154,9 @@ bool files_checktmp(files_t *fs, int id, const checksum_t checksum_in) {
     uint8_t *buffer = nullptr;
     checksum_t checksum;
     const char *tmpname = mktmpname(fs->files[id].filename);
-    char fullname[MAX_DIRNAME_LENGTH + MAX_FILENAME_LENGTH];
+    char fullname[FULLNAME];
     mkfullname(fullname, fs->dirname, tmpname);
-    assert(fs->nfp->fopen(tmpname, "rb"));
+    assert(fs->nfp->fopen(fullname, "rb"));
     int len = fmemread_secure(fs->nfp, fs->nastiness, &buffer, 0,
                               length(fullname), checksum);
     fs->nfp->fclose();
@@ -167,9 +166,11 @@ bool files_checktmp(files_t *fs, int id, const checksum_t checksum_in) {
 
 // renames TMP file to permanent
 void files_savepermanent(files_t *fs, int id) {
-    char *filename = fs->files[id].filename;
-    char *tmpname = mktmpname(filename);
-    rename(filename, tmpname);
+    char filename[FULLNAME];
+    char tmpname[FULLNAME];
+    mkfullname(filename, fs->dirname, fs->files[id].filename);
+    mkfullname(tmpname, fs->dirname, mktmpname(fs->files[id].filename));
+    rename(tmpname, filename);
 }
 
 void files_remove(files_t *fs, int id) { remove(fs->files[id].filename); }
