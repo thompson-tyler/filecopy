@@ -50,6 +50,7 @@ int main(int argc, char **argv) {
     files_t fs;
     fs.nfp = nfp;
     fs.nastiness = file_nastiness;
+    fs.dirname = targetdir;
 
     cache_t *cache = cache_new();
 

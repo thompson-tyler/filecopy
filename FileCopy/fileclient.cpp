@@ -47,8 +47,8 @@ int main(int argc, char **argv) {
     cerr << "Set up socket and file handler" << endl;
 
     messenger_t messenger = {sock, network_nastiness, 0};
-    files_t fs;
 
+    files_t fs;
     files_register_fromdir(&fs, srcdir, nfp, file_nastiness);
 
     try {

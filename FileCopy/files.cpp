@@ -18,12 +18,11 @@ using namespace C150NETWORK;
                     MAX_FILENAME_LENGTH),                             \
             ".tmp"))
 
-int fmemread_secure(C150NastyFile *nfp, const char *srcfile,
-                    const int nastiness, uint8_t **buffer_pp, int offset,
-                    int nbytes, unsigned char checksum_out[]);
+int fmemread_secure(C150NastyFile *nfp, const int nastiness,
+                    uint8_t **buffer_pp, int offset, int nbytes,
+                    unsigned char checksum_out[]);
 
-int fmemread_naive(NASTYFILE *nfp, const char *file, uint8_t **buffer_pp,
-                   int offset, int nbytes);
+int fmemread_naive(NASTYFILE *nfp, uint8_t **buffer_pp, int offset, int nbytes);
 
 int length(const char *filename);
 
@@ -59,6 +58,12 @@ bool files_register(files_t *fs, int id, const char *filename) {
     return true;
 }
 
+void mkfullname(char *dst, const char *dirname, const char *fname) {
+    assert(dst && dirname && fname);
+    strncpy(dst, dirname, MAX_DIRNAME_LENGTH);
+    strncat(dst, fname, MAX_FILENAME_LENGTH);
+}
+
 int files_topackets(files_t *fs, int id, packet_t *prep_out,
                     packet_t **sections_out, packet_t *check_out) {
     assert(fs && prep_out && sections_out && check_out);
@@ -69,9 +74,15 @@ int files_topackets(files_t *fs, int id, packet_t *prep_out,
     checksum_t checksum;
 
     // read the file
-    assert(fs->nfp->fopen(filename, "rb"));
-    int len = fmemread_secure(fs->nfp, filename, fs->nastiness, &buffer, 0, -1,
-                              checksum);
+    assert(strnlen(fs->dirname, MAX_DIRNAME_LENGTH) > MAX_DIRNAME_LENGTH);
+
+    // open file
+    char fullname[MAX_DIRNAME_LENGTH + MAX_FILENAME_LENGTH];
+    mkfullname(fullname, fs->dirname, filename);
+    assert(fs->nfp->fopen(fullname, "rb"));
+
+    int len = fmemread_secure(fs->nfp, fs->nastiness, &buffer, 0,
+                              length(fullname), checksum);
     fs->nfp->fclose();
     if (len == -1) {
         fprintf(stderr, "critical failure parsing %s\n", filename);
@@ -110,12 +121,16 @@ void files_storetmp(files_t *fs, int id, int offset, int nbytes,
     assert(buffer_in && fs);
     assert(offset >= 0 && nbytes > 0);
 
-    const char *filename = mktmpname(fs->files[id].filename);
+    const char *tmpname = mktmpname(fs->files[id].filename);
+    assert(tmpname);
+
     checksum_t checksum_in;
     checksum_t checksum_out;
 
-    assert(filename);
-    assert(fs->nfp->fopen(filename, "rb"));
+    // file open
+    char fullname[MAX_DIRNAME_LENGTH + MAX_FILENAME_LENGTH];
+    mkfullname(fullname, fs->dirname, tmpname);
+    assert(fs->nfp->fopen(fullname, "rb"));
 
     SHA1((unsigned char *)buffer_in, nbytes, checksum_in);
     uint8_t *buffer = nullptr;
@@ -124,8 +139,8 @@ void files_storetmp(files_t *fs, int id, int offset, int nbytes,
     do {
         fs->nfp->fseek(offset, SEEK_SET);
         fs->nfp->fwrite(buffer_in, 1, nbytes);
-        int len = fmemread_secure(fs->nfp, filename, fs->nastiness, &buffer,
-                                  offset, nbytes, checksum_out);
+        int len = fmemread_secure(fs->nfp, fs->nastiness, &buffer, offset,
+                                  nbytes, checksum_out);
         if (len != nbytes) continue;
 
         free(buffer);
@@ -140,9 +155,11 @@ bool files_checktmp(files_t *fs, int id, const checksum_t checksum_in) {
     uint8_t *buffer = nullptr;
     checksum_t checksum;
     const char *tmpname = mktmpname(fs->files[id].filename);
+    char fullname[MAX_DIRNAME_LENGTH + MAX_FILENAME_LENGTH];
+    mkfullname(fullname, fs->dirname, tmpname);
     assert(fs->nfp->fopen(tmpname, "rb"));
-    int len = fmemread_secure(fs->nfp, tmpname, fs->nastiness, &buffer, 0, -1,
-                              checksum);
+    int len = fmemread_secure(fs->nfp, fs->nastiness, &buffer, 0,
+                              length(fullname), checksum);
     fs->nfp->fclose();
     free(buffer);
     return len != -1 && memcmp(checksum, checksum_in, SHA_LEN) == 0;
@@ -166,16 +183,16 @@ void files_remove(files_t *fs, int id) { remove(fs->files[id].filename); }
 
 // Brute force secure read
 // needs to have 2 flawless of MAX_DISK_RETRIES reads
-int fmemread_secure(C150NastyFile *nfp, const char *srcfile,
-                    const int nastiness, uint8_t **buffer_pp, int offset,
-                    int nbytes, unsigned char checksum_out[]) {
+int fmemread_secure(C150NastyFile *nfp, const int nastiness,
+                    uint8_t **buffer_pp, int offset, int nbytes,
+                    unsigned char checksum_out[]) {
     assert(buffer_pp && *buffer_pp == nullptr);
     assert(checksum_out);
 
     auto checksums = new unsigned char[MAX_DISK_RETRIES + nastiness][SHA_LEN];
     for (int i = 0; i < MAX_DISK_RETRIES + nastiness; i++) {  // for each try
         uint8_t *buffer = nullptr;
-        int buflen = fmemread_naive(nfp, srcfile, &buffer, offset, nbytes);
+        int buflen = fmemread_naive(nfp, &buffer, offset, nbytes);
         assert(buffer);
         verify(buflen > 0);
 
@@ -194,20 +211,19 @@ int fmemread_secure(C150NastyFile *nfp, const char *srcfile,
         }
 
         free(buffer);  // free the bad buffer
-        if (i > 1) debug("failed read of %s for %ith time\n", srcfile, i);
+        if (i > 1) debug("failed read of file for %ith time\n", i);
     }
 
     fprintf(stderr,
-            "Disk failure -- unable to reliably open file %s in %d attempts\n",
-            srcfile, MAX_DISK_RETRIES);
+            "Disk failure -- unable to reliably open file in %d attempts\n",
+            MAX_DISK_RETRIES);
     return -1;
 }
 
 // Read whole input file (mostly taken from Noah's samples)
-int fmemread_naive(NASTYFILE *nfp, const char *file, uint8_t **buffer_pp,
-                   int offset, int nbytes) {
+int fmemread_naive(NASTYFILE *nfp, uint8_t **buffer_pp, int offset,
+                   int nbytes) {
     assert(*buffer_pp == nullptr);
-    if (offset == 0 && nbytes == -1) nbytes = length(file);
     verify(nbytes > 0 && offset >= 0);
 
     uint8_t *buffer = (uint8_t *)malloc(nbytes);
@@ -215,8 +231,7 @@ int fmemread_naive(NASTYFILE *nfp, const char *file, uint8_t **buffer_pp,
 
     nfp->fseek(offset, SEEK_SET);
     int len = nfp->fread(buffer, 1, nbytes);
-
-    verify(len != nbytes);
+    assert(len == nbytes);
 
     *buffer_pp = buffer;
     return len;
