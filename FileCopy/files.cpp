@@ -92,7 +92,7 @@ int files_topackets(files_t *fs, int id, packet_t *prep_out,
     }
 
     const int max_datalen = sizeof((*sections_out)->value.section.data);
-    int nparts = len / max_datalen + (len % max_datalen ? 1 : 0);
+    int nparts = (len / max_datalen) + (len % max_datalen ? 1 : 0);
 
     // make prepare_for_blob message packet
     packet_prepare(prep_out, id, filename, nparts);
@@ -102,7 +102,7 @@ int files_topackets(files_t *fs, int id, packet_t *prep_out,
     assert(sections);
     for (int i = 0; i < nparts; i++) {
         int offset = i * max_datalen;
-        int size = min(size, len - offset);
+        int size = min(max_datalen, len - offset);
         packet_section(&sections[i], id, i, offset, size, buffer + offset);
     }
 

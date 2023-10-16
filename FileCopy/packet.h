@@ -73,8 +73,6 @@ struct packet_t {
 };
 
 /* constructors */
-void packet_ack(packet_t *p);
-void packet_sos(packet_t *p);
 void packet_checkisnecessary(packet_t *p, fid_t id, const char *filename,
                              const checksum_t checksum);
 void packet_keepit(packet_t *p, fid_t id);

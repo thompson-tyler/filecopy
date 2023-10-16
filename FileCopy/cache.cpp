@@ -7,6 +7,7 @@
 
 #include "c150debug.h"
 #include "files.h"
+#include "utils.h"
 
 using namespace C150NETWORK;
 using namespace std;
@@ -50,70 +51,47 @@ void bounce(files_t *fs, cache_t *cache, packet_t *p) {
 #define SOS false
 #define ACK true
 
+bool bad_seqno(cache_t *c, int id, int seqno) {
+    return c->entries[id].seqno == -1 || c->entries[id].seqno > seqno;
+}
+
 struct entry_t {
     seq_t seqno;
     int n_parts;
     bool *recvparts;
     bool verified;
+    entry_t() {
+        seqno = -1;
+        n_parts = 0;
+        recvparts = nullptr;
+        verified = false;
+    }
 };
 
-// these settings are important and relied on elsewhere
-// be careful before modifying
-void entry_init(entry_t *e) {
-    assert(e);
-    e->seqno = -1;
-    e->n_parts = 0;
-    e->recvparts = nullptr;
-    e->verified = false;
-}
-
-// initializes size to 40 files
-cache_t *cache_new() {
-    cache_t *c = (cache_t *)malloc(sizeof(*c));
-    assert(c);
-    c->cap = 40;
-    c->nel = 0;
-    c->entries = (entry_t *)malloc(sizeof(*c->entries) * c->cap);
-    assert(c->entries);
-    for (int i = 0; i < c->cap; i++) entry_init(&c->entries[i]);
-    return c;
-}
-
-void cache_free(cache_t **cache_pp) {
-    assert(cache_pp && *cache_pp);
-    cache_t *c = *cache_pp;
-    for (int i = 0; i < c->nel; i++) free(c->entries->recvparts);
-    free(c->entries);
-    *cache_pp = nullptr;
-}
-
-void cache_add_id_if_necessary(cache_t *cache, int id) {
-    cache->nel = max(cache->nel, id + 1);
-    while (cache->cap <= id) {  // add new space for ids
-        int newcap = cache->cap / 2;
-        cache->entries = (entry_t *)realloc(cache->entries,
-                                            sizeof(*cache->entries) * newcap);
-        assert(cache->entries);
-        for (int i = cache->cap; i < newcap; i++)
-            entry_init(&cache->entries[i]);
-        cache->cap = newcap;
+void cache_free(cache_t *cache) {
+    assert(cache);
+    for (auto kv_pair : cache->entries) {
+        entry_t *e = kv_pair.second();
+        free(e->recvparts);
     }
 }
 
 bool idempotent_prepareforfile(files_t *fs, cache_t *cache, fid_t id,
                                seq_t seqno, int n_parts, const char *filename) {
     assert(fs && cache);
-    cache_add_id_if_necessary(cache, id);
-    if (cache->entries[id].seqno > seqno) return SOS;
-    if (cache->entries[id].seqno == seqno) return ACK;
+    if (cache->entries[id].seqno > seqno)
+        return SOS;
+    else if (cache->entries[id].seqno == seqno)
+        return ACK;
 
-    // got a new prepare!!
-    files_register(fs, id, filename, true);
+    // got a brand new prepare!!
+    if (cache->entries[id].recvparts == nullptr)
+        files_register(fs, id, filename, true);
 
+    cache->entries[id].n_parts = n_parts;
     // realloc in case we've already tried
     cache->entries[id].recvparts =
         (bool *)realloc(cache->entries[id].recvparts, sizeof(bool) * n_parts);
-    cache->entries[id].n_parts = n_parts;
     for (int i = 0; i < n_parts; i++) cache->entries[id].recvparts[i] = false;
 
     // new seqno means we are prepared for file
@@ -125,8 +103,8 @@ bool idempotent_storesection(files_t *fs, cache_t *cache, fid_t id, seq_t seqno,
                              int partno, int offset, int len,
                              const uint8_t *data) {
     assert(fs && cache);
-    if (id > cache->nel || cache->entries[id].seqno > seqno ||
-        partno >= cache->entries[id].n_parts || !cache->entries[id].recvparts)
+    if (bad_seqno(cache, id, seqno) || partno >= cache->entries[id].n_parts ||
+        cache->entries[id].recvparts == nullptr)
         return SOS;
 
     // already got it!
@@ -141,40 +119,43 @@ bool idempotent_checkfile(files_t *fs, cache_t *cache, fid_t id, seq_t seqno,
                           const char *filename,
                           const unsigned char *checksum_in) {
     assert(fs && cache);
-    cache_add_id_if_necessary(cache, id);
 
     // for files in the directory that never received a prepare msg
-    if (id > cache->nel || cache->entries[id].seqno == -1)
+    if (cache->entries[id].seqno == -1)
         files_register(fs, id, filename, false);
     else if (cache->entries[id].seqno > seqno)
         return SOS;
 
     // SOS if missing parts, skipped for new files
     for (int i = 0; i < cache->entries[id].n_parts; i++)
-        if (!cache->entries[id].recvparts[i]) return SOS;
+        if (cache->entries[id].recvparts[i] == false) return SOS;
 
     // maybe we just checked it
     if (cache->entries[id].seqno == seqno)
         return cache->entries[id].verified ? ACK : SOS;
 
+    errp("CHECKING FILE: %s\n", filename);
+
     // do check
     cache->entries[id].verified = files_checktmp(fs, id, checksum_in);
 
-    // new seqno means we know the answer of end2end
-    // check
+    errp("CHECKING SUCCESS: %s\n",
+         cache->entries[id].verified ? "TRUE" : "FALSE");
+
+    // new seqno means we know the answer of end2end check
     cache->entries[id].seqno = seqno;
+
     return cache->entries[id].verified ? ACK : SOS;
 }
 
 bool idempotent_savefile(files_t *fs, cache_t *cache, fid_t id, seq_t seqno) {
     assert(fs && cache);
-    if (id > cache->nel || cache->entries[id].seqno > seqno ||
-        !cache->entries[id].verified)
-        return SOS;
+    if (bad_seqno(cache, id, seqno) || !cache->entries[id].verified) return SOS;
 
     // just did it!
     if (cache->entries[id].seqno == seqno) return ACK;
 
+    errp("COMPLETED id: %d %s\n", id, fs->files[id].filename);
     files_savepermanent(fs, id);
 
     // new seqno means we have saved the file
@@ -184,16 +165,16 @@ bool idempotent_savefile(files_t *fs, cache_t *cache, fid_t id, seq_t seqno) {
 
 bool idempotent_deletefile(files_t *fs, cache_t *cache, fid_t id, seq_t seqno) {
     assert(fs && cache);
-    if (id > cache->nel || cache->entries[id].seqno > seqno ||
-        cache->entries[id].verified)
-        return SOS;
+
+    if (bad_seqno(cache, id, seqno) || cache->entries[id].verified) return SOS;
 
     // just did it!
     if (cache->entries[id].seqno == seqno) return ACK;
 
     files_remove(fs, id);
-    free(cache->entries[id].recvparts);
-    entry_init(&cache->entries[id]);
+
+    for (int i = 0; i < cache->entries[id].n_parts; i++)
+        cache->entries[id].recvparts[i] = false;
 
     // new seqno means we have deleted the file
     cache->entries[id].seqno = seqno;

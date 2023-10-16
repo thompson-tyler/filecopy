@@ -18,13 +18,10 @@ struct entry_t;
 // The cache, purely exists as an optimization.
 // Theoretically everything could work without it
 struct cache_t {
-    entry_t *entries = nullptr;
-    int nel;
-    int cap;
+    unordered_map<int, entry_t> entries;
 };
 
-cache_t *cache_new();
-void cache_free(cache_t **cache_pp);
+void cache_free(cache_t *cache);
 
 // bounce :: packet_t -> packet_t
 // Performs incoming packet action and constructs response packet in place.

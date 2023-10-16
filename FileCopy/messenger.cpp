@@ -5,6 +5,8 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
+#include <cstdio>
+
 #include "c150debug.h"
 #include "c150network.h"
 #include "files.h"
@@ -24,7 +26,7 @@ bool made_progress(int prev, int curr, int nastiness) {
 }
 
 // TODO: factor in nastiness
-bool throttle(int nel, int nastiness) {
+int throttle(int nel, int nastiness) {
     (void)nastiness;
     return nel;
 }
@@ -60,7 +62,7 @@ bool send(messenger_t *m, packet_t *packets, int n_packets) {
         }
 
         int unanswered_prev = unanswered;
-        while (!m->sock->timedout() && unanswered) {  // read all incoming
+        do {  // read all incoming
             int len = m->sock->read((char *)&p, MAX_PACKET_SIZE);
             if (len != p.hdr.len || p.hdr.seqno < minseqno) continue;
             if (p.hdr.type == SOS && seqmap[p.hdr.seqno % n_packets]) {
@@ -70,7 +72,7 @@ bool send(messenger_t *m, packet_t *packets, int n_packets) {
                 seqmap[p.hdr.seqno % n_packets] = nullptr;
                 unanswered--;
             }
-        }
+        } while (!m->sock->timedout() && unanswered);
 
         if (unanswered == 0) {
             free(seqmap);
@@ -79,7 +81,7 @@ bool send(messenger_t *m, packet_t *packets, int n_packets) {
             resends = MAX_RESEND_ATTEMPTS;  // earned more slack
 
         errp(
-            "attempting resend after %d resends, after sending %d and reading "
+            "have %d remaining resends, after sending %d and reading "
             "in %d\n",
             resends, sent, unanswered_prev - unanswered);
     }
@@ -104,6 +106,9 @@ void transfer(files_t *fs, messenger_t *m) {
         } else if (attempts >= MAX_SOS_COUNT)
             throw C150NETWORK::C150NetworkException(
                 "Failed file transfer after MAX SOS COUNT");
+        else {
+            errp("got SOS trying again");
+        }
     }
 }
 
@@ -114,10 +119,14 @@ bool end2end(packet_t *check, int id, messenger_t *m) {
         packet_keepit(&p, id);
     else
         packet_deleteit(&p, id);
-    return send(m, &p, 1);
+    return endtoend && send(m, &p, 1);
 }
 
 bool filesend(packet_t *prep_out, packet_t *sections_out, messenger_t *m) {
+    errp("SENDING FILE:\n%s", prep_out->tostring().c_str());
+    for (int i = 0; i < 5 && i < prep_out->value.prep.nparts; i++) {
+        errp("SECTION:\n%s", sections_out[i].tostring().c_str());
+    }
     bool success = send(m, prep_out, 1) &&
                    send(m, sections_out, prep_out->value.prep.nparts);
     free(sections_out);

@@ -40,8 +40,6 @@ int main(int argc, char **argv) {
     // Set up socket
     C150DgmSocket *sock = new C150NastyDgmSocket(network_nastiness);
     sock->setServerName(server_name);
-    sock->turnOnTimeouts(CLIENT_TIMEOUT);
-    assert(sock->timeoutIsSet());
 
     // Set up file handler
     C150NastyFile *nfp = new C150NastyFile(file_nastiness);
@@ -49,6 +47,8 @@ int main(int argc, char **argv) {
     cerr << "Set up socket and file handler" << endl;
 
     messenger_t messenger = {sock, network_nastiness, 0};
+    messenger.sock->turnOnTimeouts(CLIENT_TIMEOUT);
+    assert(messenger.sock->timeoutIsSet());
 
     files_t fs;
     files_register_fromdir(&fs, srcdir, nfp, file_nastiness);
