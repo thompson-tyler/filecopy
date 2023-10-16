@@ -10,6 +10,7 @@
 #include "files.h"
 #include "packet.h"
 #include "settings.h"
+#include "utils.h"
 
 using namespace C150NETWORK;
 
@@ -51,7 +52,8 @@ bool send(messenger_t *m, packet_t *packets, int n_packets) {
     int max_group = throttle(MAX_SEND_GROUP, m->nastiness);
     for (int resends = MAX_RESEND_ATTEMPTS; resends > 0; resends--) {
         // send group of unanswered packets
-        for (int i = 0, sent = 0; i < n_packets && sent < max_group; i++) {
+        int sent = 0;
+        for (int i = 0; i < n_packets && sent < max_group; i++) {
             if (seqmap[i] == nullptr) continue;
             m->sock->write((char *)seqmap[i], seqmap[i]->hdr.len);
             sent++;
@@ -75,6 +77,11 @@ bool send(messenger_t *m, packet_t *packets, int n_packets) {
             return true;
         } else if (made_progress(unanswered_prev, unanswered, m->nastiness))
             resends = MAX_RESEND_ATTEMPTS;  // earned more slack
+
+        errp(
+            "attempting resend after %d resends, after sending %d and reading "
+            "in %d\n",
+            resends, sent, unanswered_prev - unanswered);
     }
 
     free(seqmap);

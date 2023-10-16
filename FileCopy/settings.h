@@ -11,8 +11,8 @@
 // #define JUST_END_TO_END
 
 // Messenger settings
-#define MESSENGER_TIMEOUT 1000
-#define MAX_RESEND_ATTEMPTS 10
+#define CLIENT_TIMEOUT 3000
+#define MAX_RESEND_ATTEMPTS 50
 
 // Number of times the client manager will try to send a file before giving up
 #define MAX_SOS_COUNT 4

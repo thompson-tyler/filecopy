@@ -40,7 +40,8 @@ int main(int argc, char **argv) {
     // Set up socket
     C150DgmSocket *sock = new C150NastyDgmSocket(network_nastiness);
     sock->setServerName(server_name);
-    sock->turnOnTimeouts(2000);
+    sock->turnOnTimeouts(CLIENT_TIMEOUT);
+    assert(sock->timeoutIsSet());
 
     // Set up file handler
     C150NastyFile *nfp = new C150NastyFile(file_nastiness);

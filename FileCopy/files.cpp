@@ -234,14 +234,11 @@ int fmemread_naive(NASTYFILE *nfp, uint8_t **buffer_pp, int offset,
     assert(*buffer_pp == nullptr);
     verify(nbytes > 0 && offset >= 0);
 
-    errp("attempt naive read %d bytes at %ld\n", nbytes, nfp->ftell());
-
     uint8_t *buffer = (uint8_t *)malloc(nbytes);
     assert(buffer);
 
     nfp->fseek(offset, SEEK_SET);
     int len = nfp->fread(buffer, 1, nbytes);
-    errp("completed read %d bytes now at %ld\n", len, nfp->ftell());
     assert(len == nbytes);
 
     *buffer_pp = buffer;
