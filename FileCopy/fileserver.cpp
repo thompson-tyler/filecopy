@@ -14,6 +14,7 @@
 
 using namespace C150NETWORK;
 
+// this is the server... it just runs... pretty much it
 void listen(C150DgmSocket *sock, files_t *files, cache_t *cache) {
     packet_t p;
     do {

@@ -14,8 +14,8 @@
 using namespace C150NETWORK;
 using namespace std;
 
-// bounce :: packet_t -> packet_t
-// Performs incoming packet action and constructs response packet in place.
+// Hands packet off to the cache and executes idempotent action
+// Also updates seqmax if necessary
 void bounce(files_t *fs, cache_t *cache, packet_t *p) {
     bool rsp_ack = false;
     fid_t id = p->hdr.id;
@@ -71,9 +71,9 @@ void cache_free(cache_t *cache) {
 }
 
 bool idempotent_prepareforfile(files_t *fs, cache_t *cache, fid_t id,
-                               seq_t seqno, int length, int n_parts,
+                               seq_t seqno, int filelength, int n_parts,
                                const char *filename) {
-    assert(fs && cache);
+    assert(fs && cache && filename);
     if (cache->entries[id].seqno > seqno)
         return BAD;
     else if (cache->entries[id].seqno == seqno)
@@ -87,9 +87,9 @@ bool idempotent_prepareforfile(files_t *fs, cache_t *cache, fid_t id,
     cache->entries[id].n_parts = n_parts;
     cache->entries[id].recvparts =
         (bool *)realloc(cache->entries[id].recvparts, sizeof(bool) * n_parts);
-    cache->entries[id].buflen = length;
+    cache->entries[id].buflen = filelength;
     cache->entries[id].buffer =
-        (uint8_t *)realloc(cache->entries[id].buffer, length);
+        (uint8_t *)realloc(cache->entries[id].buffer, filelength);
     for (int i = 0; i < n_parts; i++) cache->entries[id].recvparts[i] = false;
 
     // new seqno means we are prepared for file
@@ -100,7 +100,7 @@ bool idempotent_prepareforfile(files_t *fs, cache_t *cache, fid_t id,
 bool idempotent_storesection(files_t *fs, cache_t *cache, fid_t id, seq_t seqno,
                              int partno, int offset, int len,
                              const uint8_t *data) {
-    assert(fs && cache);
+    assert(fs && cache && data);
     if (bad_seqno(cache, id, seqno) || partno >= cache->entries[id].n_parts ||
         cache->entries[id].recvparts == nullptr)
         return BAD;
@@ -117,7 +117,7 @@ bool idempotent_storesection(files_t *fs, cache_t *cache, fid_t id, seq_t seqno,
 bool idempotent_checkfile(files_t *fs, cache_t *cache, fid_t id, seq_t seqno,
                           const char *filename,
                           const unsigned char *checksum_in) {
-    assert(fs && cache);
+    assert(fs && cache && checksum_in);
 
     // for files in the directory that never received a prepare msg
     if (cache->entries[id].seqno == -1)

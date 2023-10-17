@@ -30,7 +30,6 @@ packet_t **assign_sequences(messenger_t *m, packet_t *packets, int n_packets) {
 }
 
 bool send(messenger_t *m, packet_t *packets, int n_packets) {
-    // sanity checks
     assert(m && packets);
     assert(n_packets > 0);
 
@@ -42,30 +41,30 @@ bool send(messenger_t *m, packet_t *packets, int n_packets) {
 
     int unanswered = n_packets;
     for (int resends = RESENDS(nasty); resends && unanswered; resends--) {
-        // send group of unanswered packets
+        // send as large a group as possible of remaining unanswered packets
         int sent = 0;
         for (int i = 0; i < n_packets && sent < SEND_GROUP(nastiness); i++) {
-            if (seqmap[i] == nullptr) continue;
+            if (seqmap[i] == nullptr) continue;  // already sent and received
             m->sock->write((char *)seqmap[i], seqmap[i]->hdr.len);
             sent++;
         }
 
         int unanswered_prev = unanswered;
 
-        do {  // read all incoming
+        do {  // read incoming
             int len = m->sock->read((char *)&p, MAX_PACKET_SIZE);
             if (len != p.hdr.len || p.hdr.seqno < minseqno ||
                 (p.hdr.type & (ACK | SOS)) == 0)
                 continue;
-            if (p.hdr.seqno > m->seqcount ||  // message from future?
+            if (p.hdr.seqno > m->seqcount ||  // SOS or msg from future? abort!
                 (p.hdr.type == SOS && seqmap[p.hdr.seqno % n_packets])) {
-                m->seqcount = max(m->seqcount, p.value.seqmax + 1);
+                m->seqcount = max(m->seqcount, p.value.seqmax);  // goto future
                 return free(seqmap), false;
             } else if (p.hdr.type == ACK && seqmap[p.hdr.seqno % n_packets]) {
-                seqmap[p.hdr.seqno % n_packets] = nullptr;
-                unanswered--;
+                seqmap[p.hdr.seqno % n_packets] = nullptr;  // mark it recvd
+                unanswered--;                               // we got one!
             }
-        } while (!m->sock->timedout() && unanswered);
+        } while (!m->sock->timedout() && unanswered);  // keep em' comin
 
         // cut me some slack, im trying
         if (unanswered_prev > unanswered) resends = RESENDS(nasty);
@@ -90,25 +89,25 @@ void transfer(files_t *fs, messenger_t *m) {
             end2end(&check, id, m))
             attempts = 0, it++;  // onto the next one
         else if (attempts >= MAX_SOS)
-            throw C150NetworkException("Hit SOS MAX. Transfer failed");
+            throw C150NetworkException("Hit SOS MAX. Transfer failed.");
         else
-            errp("got SOS trying again\n");
+            errp("Got SOS trying again.\n");
     }
 }
 
 bool end2end(packet_t *check, int id, messenger_t *m) {
-    errp("SENDING REQ FOR CHECK:\n%s", check->tostring().c_str());
+    errp("sending CHECK_IS_NECESSARY:\n%s", check->tostring().c_str());
     bool endtoend = send(m, check, 1);
-    endtoend ? errp("SENDING KEEP\n") : errp("SENDING DELETE\n");
     if (endtoend)
         packet_keepit(check, id);
     else
         packet_deleteit(check, id);
+    endtoend ? errp("sent KEEP_IT\n") : errp("sent DELETE_IT\n");
     return endtoend && send(m, check, 1);
 }
 
 bool filesend(packet_t *prep_out, packet_t *sections_out, messenger_t *m) {
-    errp("SENDING FILE:\n%s", prep_out->tostring().c_str());
+    errp("sending PREPARE && SECTIONS:\n%s", prep_out->tostring().c_str());
     bool succ = send(m, prep_out, 1);
     if (!succ)
         errp("RECEIVED SOS ON PREPARE FILE\n");

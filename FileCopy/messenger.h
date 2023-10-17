@@ -17,7 +17,8 @@ struct messenger_t {
 
 /*
  * purpose:
- *      guarantees that the server received
+ *      guarantees that the server received and executed each
+ *      packet's message
  * params:
  *      ptr to valid array of <n_packets> many packets
  * returns:
@@ -27,9 +28,21 @@ bool send(messenger_t *m, packet_t *packets, int n_packets);
 
 /*
  * purpose:
- *      send all the filenames in the collection
+ *      send all the filenames in the collection from the client
+ *
+ *      for each file
+ *         read from disk and split it into packets
+ *         send a prepare message
+ *         send all sections (could be concurrent)
+ *         send request for checksum verification
+ *           if SOS
+ *             send delete it
+ *           else
+ *             send keep it
+ *
+ *     if any give SOS try that file again until MAX_SOS
  * params:
- *      ptr to valid array of <n_packets> many packets
+ *      a fs loaded ideally by using register_fromdir()
  * returns:
  *      false if recv SOS : true if recv ACK
  * */

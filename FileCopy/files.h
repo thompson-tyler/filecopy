@@ -15,7 +15,7 @@ typedef unsigned char checksum_t[SHA_DIGEST_LENGTH];
 
 #define FULLNAME (FILENAME_LENGTH + DIRNAME_LENGTH)
 
-// trick the c++ compiler into giving full space
+// tricks the c++ compiler into giving full space (boo c++ compiler!!)
 struct file_entry_t {
     char filename[FULLNAME] = {0};
 };
@@ -28,9 +28,9 @@ struct files_t {
     unordered_map<int, file_entry_t> files;
 };
 
-/*
- * files_t object functions
- **/
+/***************************/
+/* files manager functions */
+/***************************/
 
 // allocates and populates all fields
 void files_register_fromdir(files_t *fs, char *dirname,
@@ -46,23 +46,22 @@ void files_register_fromdir(files_t *fs, char *dirname,
 bool files_register(files_t *fs, int id, const char *filename,
                     bool allow_touch);
 
-/*
- * filesystem IO wrappers
- **/
+/**************************/
+/* filesystem IO wrappers */
+/**************************/
 
 // returns nel of packets in sections_out
 int files_topackets(files_t *fs, int id, packet_t *prep_out,
                     packet_t **sections_out, packet_t *check_is_necessary);
 
+// purpose:
+//      stores in <dirname>/<filename>.tmp file
 // params:
 //      buffer_in != nullptr
-//
+//      |buffer_in| == nbytes
 // returns:
 //      true if write is guaranteed safe and correct
 //      false if disk "bugs" cannot be remedied
-//
-// stores in <dirname>/<filename>.tmp file
-//
 bool files_writetmp(files_t *fs, int id, int nbytes, const void *buffer_in,
                     const checksum_t checksum_in);
 

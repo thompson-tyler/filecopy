@@ -77,6 +77,16 @@ bool files_register(files_t *fs, int id, const char *filename,
     return true;
 }
 
+/*
+ * Given a file id, puts the following into packets
+ *
+ * All data, sectioned into maximum possible sections
+ * Number of sections
+ * Filelength
+ * Filename
+ * File SHA1 hash value
+ * File id
+ */
 int files_topackets(files_t *fs, int id, packet_t *prep_out,
                     packet_t **sections_out, packet_t *check_out) {
     assert(fs && prep_out && sections_out && check_out);
@@ -118,10 +128,8 @@ int files_topackets(files_t *fs, int id, packet_t *prep_out,
     return nparts;
 }
 
-// buffer_in != nullptr && 0 <= start <= end <= length
-// guaranteed safe!
-//
-// stores in TMP file
+// buffer_in != nullptr
+// guaranteed safe write!
 bool files_writetmp(files_t *fs, int id, int nbytes, const void *buffer_in,
                     const checksum_t checksum_in) {
     assert(buffer_in && fs);
