@@ -13,9 +13,11 @@
 
 typedef unsigned char checksum_t[SHA_DIGEST_LENGTH];
 
+#define FULLNAME (FILENAME_LENGTH + DIRNAME_LENGTH)
+
 // trick the c++ compiler into giving full space
 struct file_entry_t {
-    char filename[FILENAME_LENGTH] = {0};
+    char filename[FULLNAME] = {0};
 };
 
 struct files_t {

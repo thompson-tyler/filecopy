@@ -52,8 +52,8 @@ struct prepare_for_blob_t {
 
 struct blob_section_t {
     int partno;
-    int start;
-    uint8_t data[MAX_PAYLOAD_SIZE - sizeof(partno) - sizeof(start)];
+    int offset;
+    uint8_t data[MAX_PAYLOAD_SIZE - sizeof(partno) - sizeof(offset)];
 };
 
 union payload_u {
@@ -66,11 +66,8 @@ struct packet_t {
     header_t hdr;
     payload_u value;
 
-    /* blob section data length */
-    int datalen();
-
-    // for debugging
-    std::string tostring();
+    int datalen();          /* blob section data length */
+    std::string tostring(); /* for debugging */
 };
 
 /* constructors */

@@ -43,7 +43,7 @@ void bounce(files_t *fs, cache_t *cache, packet_t *p) {
         case BLOB_SECTION:
             is_ack = idempotent_storesection(
                 fs, cache, id, seqno, value->section.partno,
-                value->section.start, p->datalen(), value->section.data);
+                value->section.offset, p->datalen(), value->section.data);
             break;
     }
     p->hdr.type = is_ack ? ACK : SOS;
@@ -103,6 +103,7 @@ bool idempotent_storesection(files_t *fs, cache_t *cache, fid_t id, seq_t seqno,
     // already got it!
     if (cache->entries[id].recvparts[partno]) return ACK;
 
+    // write it down!
     memcpy(cache->entries[id].buffer + offset, data, len);
     cache->entries[id].recvparts[partno] = true;
     return ACK;
@@ -121,10 +122,7 @@ bool idempotent_checkfile(files_t *fs, cache_t *cache, fid_t id, seq_t seqno,
 
     // SOS if missing parts, skipped for new files
     for (int i = 0; i < cache->entries[id].n_parts; i++)
-        if (cache->entries[id].recvparts[i] == false) {
-            errp("CANNOT CHECK %s because incomplete\n", filename);
-            return SOS;
-        }
+        if (cache->entries[id].recvparts[i] == false) return SOS;
 
     // maybe we just checked it
     if (cache->entries[id].seqno == seqno)
@@ -134,13 +132,14 @@ bool idempotent_checkfile(files_t *fs, cache_t *cache, fid_t id, seq_t seqno,
     checksum_t checksum;
     SHA1(cache->entries[id].buffer, cache->entries[id].buflen, checksum);
     bool success = memcmp(checksum, checksum_in, SHA_DIGEST_LENGTH) == 0;
-    cache->entries[id].verified = cache->entries[id].verified = success;
 
-    errp("CHECKING SUCCESS: %s\n", cache->entries[id].verified ? "TR" : "FL");
-
+    // writing can still trigger SOS
     if (success)
         success = files_writetmp(fs, id, cache->entries[id].buflen,
                                  cache->entries[id].buffer, checksum);
+
+    cache->entries[id].verified = success;
+    errp("CHECKING SUCCESS: %s\n", cache->entries[id].verified ? "TR" : "FL");
 
     // new seqno means we know the answer of end2end check
     cache->entries[id].seqno = seqno;
@@ -165,7 +164,6 @@ bool idempotent_savefile(files_t *fs, cache_t *cache, fid_t id, seq_t seqno) {
 
 bool idempotent_deletefile(files_t *fs, cache_t *cache, fid_t id, seq_t seqno) {
     assert(fs && cache);
-
     if (bad_seqno(cache, id, seqno) || cache->entries[id].verified) return SOS;
 
     // just did it!

@@ -23,7 +23,7 @@ void listen(C150DgmSocket *sock, files_t *files, cache_t *cache) {
         sock->write((char *)&p, p.hdr.len);
     } while (!sock->timedout());
 
-    throw C150NetworkException("One minute of inactivity, ending process");
+    throw C150NetworkException("Inactive network, ending process");
 }
 
 int main(int argc, char **argv) {

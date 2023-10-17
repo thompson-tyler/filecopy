@@ -51,7 +51,7 @@ void packet_section(packet_t *p, fid_t id, uint32_t partno, uint32_t offset,
                  sizeof(p->value.section.data) + size;
     p->hdr.id = id;
     p->value.section.partno = partno;
-    p->value.section.start = offset;
+    p->value.section.offset = offset;
     p->hdr.seqno = -1;
     memcpy(p->value.section.data, data, size);
 }
@@ -116,7 +116,7 @@ string packet_t::tostring() {
             ss << "Type: "
                << "Blob section\n";
             ss << "Section number: " << value.section.partno << endl;
-            ss << "Offset: " << value.section.start << endl;
+            ss << "Offset: " << value.section.offset << endl;
             break;
     }
     ss << "---------------\n";

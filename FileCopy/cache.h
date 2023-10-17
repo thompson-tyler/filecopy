@@ -32,6 +32,7 @@ struct entry_t {
 
 // The cache, purely exists as an optimization.
 // Theoretically everything could work without it
+// TODO: this should be a typedef
 struct cache_t {
     unordered_map<int, entry_t> entries;
 };
