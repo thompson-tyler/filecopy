@@ -30,9 +30,101 @@ Any _smartness_ is an optimization.
 - An **object** is a C++ object
 - A **module** is a set of related functions
 
+# Modules
+
+## The `packet` module
+
+This module defines the structs representing packets as defined below, as well
+as a number of functions used to easily construct those packets. All packets are
+easily sent over the network because they contain no pointers, and as such can
+be serialized easily.
+
+## The `files` module
+
+Provides functions to reliably read files from disk and a data structure
+`files_t` which stores metadata of the files on disk. This module uses a nasty
+file pointer under the hood, but provides the user with reliable reads by
+repeatedly reading a file, hashing it, and comparing the it to previous hashes
+until there are a sufficient number of matching hashes. Then all the packets
+necessary to transfer the file are returned to the caller.
+
+This module adapts to the nastiness level by reading files a greater number of
+times under larger nastiness values.
+
+## The `messenger` module
+
+Contains functions to reliably send packets over the network or send a
+collection of files to the server. A `messenger_t` struct must be initialized
+with a "nasty socket" and the nastiness used for that socket. The messenger
+functions will adapt to the nastiness level and allow for a greater number of
+retries under higher nastiness levels.
+
+The module has functions to send either an array of packets or a `files_t`
+instance containing files to send. The file sending function utilizes the packet
+sending function, but first splits the files up and sends the whole sequence of
+packets necessary to fully transfer each file.
+
+Both packet sending and file sending give a best effort attempt, and fail after
+a certain number of retries.
+
+After a file is sent, this module also performs an end-to-end check for that
+file by hashing it and asking the server to compare the hashes. If the check
+fails, then the transfer is retried until it succeeds, or retry threshold is
+hit.
+
+## The `cache` module
+
+This module is meant to be used entirely by the server, and is used to interpret
+and act on incoming packets. It provides a number of idempotent functions which
+correspond to the various packet types. These functions are designed to be
+called multiple times safely so that duplicate packets have no adverse effect.
+This is achieved with a combination of checking sequence numbers and checking
+file status.
+
 # The protocol
 
-### Packet Structure
+A big theme of this protocol is to make the server very simple and letting the
+client handle most of the intelligence. There are 7 packet types which work
+together to transfer files:
+
+- `SOS`
+- `ACK`
+- `PREPARE`
+- `SECTION`
+- `CHECK`
+- `KEEP`
+- `DELETE`
+
+
+### 1. Prepare for file
+
+When the client wishes to transfer a new file, it sends a `PREPARE` packet containing the filename, file length, and the number of parts (or "sections") the file will be broken into. Since each packet has a maximum size of around 500 bytes, some of the larger files we tested need to be broken into over 6000 sections. The client then waits for the server to respond with an `ACK` before moving on to sending sections.
+
+After receiving a `PREPARE` packet, the server will add a new file entry into its cache with the metadata sent over by the client. The server keeps track of the sequence number the `PREPARE` message was sent with so that it can filter out packets from older failed transfers. Since the server's actions are idempotent, if it received the same `PREPARE` packet more than once, it will `ACK` the duplicates but do nothing.
+
+### 2. Send sections
+
+Once the client has received an `ACK` for the `PREPARE`, it sends a barrage of `SECTION` packets, each a different bit of the file being sent. It waits to receive `ACK`s for these, and removes the acknowledged ones from its queue.
+
+When the server receives a `SECTION`, it ensures that is has a cache entry for the corresponding file. If it does, then it checks whether it has received that section before, and saves it if it's a new section, then responds with an `ACK`. This ensures that duplicate `SECTION`s are still ACK'd but have the same effect, giving the property of idempotence. If the server did not recognize the file that the section was for (i.e. it did not receive a `PREPARE`), then it sends an `SOS` message back to the client, indicating that it needs to restart the transfer process.
+
+### 3. Check
+
+After sending all the sections of a file and receiving ACKs for each, the client sends the hash for the entire file to the server in a `CHECK` packet. If the client then receives an `ACK`, then it knows the file is good, and if it receives an `SOS` then it knows the file transfer did not succeed and it restarts the transfer for that file.
+
+When the server receives a `CHECK` packet, it checks the following:
+
+1. That it has a file entry for the requested file
+2. That is has received all sections for the file
+3. That the server-side data hashes to the correct hash
+
+If any of these checks fail, then the server responds with `SOS` which triggers a restart of the transfer. Otherwise, the server saves the file to disk and responds with an `ACK`. If the file was already previously checked, then the server does nothing and responds with the result of that previous check, either a successful `ACK` or a failing `SOS`.
+
+### 4. Wrap up
+
+Once a file is checked
+
+## Packet Structure
 
 ```
 | HEADER                                | DATA
@@ -40,7 +132,7 @@ Any _smartness_ is an optimization.
 | -------- | ------- | ------- | ------ | --------------- | --------------- | ------------ |
 | SOS      | i32 len | i32 seq | i32 id |                 |                 |              |
 | ACK      | i32 len | i32 seq | i32 id |                 |                 |              |
-| PREPARE  | i32 len | i32 seq | i32 id | i8[80] filename | i32 filelength  | i32 nparts   |
+| PREPARE  | i32 len | i32 seq | i32 id | i8[80] filename | i32 file length | i32 nparts   |
 | SECTION  | i32 len | i32 seq | i32 id | i32 partno      | i32 offset      | u8[488] data |
 | CHECK    | i32 len | i32 seq | i32 id | u8[20] checksum | i8[80] filename |              |
 | KEEP     | i32 len | i32 seq | i32 id |                 |                 |              |
@@ -90,9 +182,10 @@ It is always assumed that these messages come in any order and may be duplicated
 The `Packet` data structure is represented as a `struct` and written to be
 easily serializable.
 
-# Objects and Modules
 
-### The `diskio` Module
+
+<!-- 
+### The `files` Module
 
 There are two utility functions here for remedying the nastyfile hard drive
 failures `fileToBuffer` and `bufferToFile` which provide reading and writing
@@ -242,4 +335,4 @@ will be good enough for now.
 Importantly though, it gets called often—anytime ANYTHING weird happens. This
 means that the client can make optimizations on top of this, but as long as
 the semantic meaning of SOS is recognized, the server can be very simple, and
-a slightly clever client can manage to ignore most calls to restart.
+a slightly clever client can manage to ignore most calls to restart. -->
