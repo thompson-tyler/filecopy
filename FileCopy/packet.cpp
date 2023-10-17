@@ -33,12 +33,13 @@ void packet_deleteit(packet_t *p, fid_t id) {
     p->hdr.seqno = -1;
 }
 
-void packet_prepare(packet_t *p, fid_t id, const char *filename,
+void packet_prepare(packet_t *p, fid_t id, const char *filename, int length,
                     uint32_t nparts) {
     p->hdr.type = PREPARE_FOR_BLOB;
     p->hdr.len = sizeof(p->hdr) + sizeof(p->value.prep);
     p->hdr.id = id;
     p->hdr.seqno = -1;
+    p->value.prep.filelength = length;
     p->value.prep.nparts = nparts;
     strncpy(p->value.prep.filename, filename, MAX_FILENAME_LENGTH);
 }
@@ -83,13 +84,13 @@ string packet_t::tostring() {
             ss << "Type: "
                << "Check is necessary\n";
             ss << "Filename: ";
-            for (int i = 0; i < MAX_FILENAME_LENGTH && value.prep.filename[i];
+            for (int i = 0; i < MAX_FILENAME_LENGTH && value.check.filename[i];
                  i++)
-                ss << value.prep.filename[i];
+                ss << value.check.filename[i];
             ss << endl;
             ss << "Checksum: ";
             for (int i = 0; i < SHA_DIGEST_LENGTH; i++)
-                ss << hex << value.check.checksum[i];
+                ss << hex << (int)value.check.checksum[i];
             ss << endl;
             break;
         case KEEP_IT:
@@ -109,6 +110,7 @@ string packet_t::tostring() {
                 ss << value.prep.filename[i];
             ss << endl;
             ss << "Number of parts: " << value.prep.nparts << endl;
+            ss << "File Length: " << value.prep.filelength << endl;
             break;
         case BLOB_SECTION:
             ss << "Type: "

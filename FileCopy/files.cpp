@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <cstring>
 
+#include "c150network.h"
 #include "packet.h"
 #include "utils.h"
 
@@ -95,7 +96,7 @@ int files_topackets(files_t *fs, int id, packet_t *prep_out,
     int nparts = (len / max_datalen) + (len % max_datalen ? 1 : 0);
 
     // make prepare_for_blob message packet
-    packet_prepare(prep_out, id, filename, nparts);
+    packet_prepare(prep_out, id, filename, len, nparts);
 
     // make all blob_section packets
     packet_t *sections = (packet_t *)malloc(sizeof(packet_t) * nparts);
@@ -118,49 +119,35 @@ int files_topackets(files_t *fs, int id, packet_t *prep_out,
 // guaranteed safe!
 //
 // stores in TMP file
-void files_storetmp(files_t *fs, int id, int offset, int nbytes,
-                    const void *buffer_in) {
+bool files_writetmp(files_t *fs, int id, int nbytes, const void *buffer_in,
+                    const checksum_t checksum_in) {
     assert(buffer_in && fs);
-    assert(offset >= 0 && nbytes > 0);
-
-    checksum_t checksum_in;
-    checksum_t checksum_out;
+    assert(nbytes > 0);
 
     // file open
     char tmpname[FULLNAME];
     mkfullname(tmpname, fs->dirname, mktmpname(fs->files[id].filename));
     assert(fs->nfp->fopen(tmpname, "w+b"));
 
-    SHA1((unsigned char *)buffer_in, nbytes, checksum_in);
     uint8_t *buffer = nullptr;
+    checksum_t checksum_out;
 
     int attempts = 0;
     do {
-        fs->nfp->fseek(offset, SEEK_SET);
+        fs->nfp->fseek(0, SEEK_SET);
         fs->nfp->fwrite(buffer_in, 1, nbytes);
-        int len = fmemread_secure(fs->nfp, fs->nastiness, &buffer, offset,
-                                  nbytes, checksum_out);
-        if (len != nbytes) continue;
-
+        int len = fmemread_secure(fs->nfp, fs->nastiness, &buffer, 0, -1,
+                                  checksum_out);
+        assert(len == nbytes);
         free(buffer);
-
-        if (memcmp(checksum_in, checksum_out, SHA_LEN) == 0) break;
+        if (memcmp(checksum_in, checksum_out, SHA_LEN) == 0) {
+            fs->nfp->fclose();
+            return true;
+        }
     } while (++attempts < MAX_DISK_RETRIES + fs->nastiness);
 
-    fs->nfp->fclose();
-}
-
-bool files_checktmp(files_t *fs, int id, const checksum_t checksum_in) {
-    uint8_t *buffer = nullptr;
-    checksum_t checksum;
-    const char *tmpname = mktmpname(fs->files[id].filename);
-    char fullname[FULLNAME];
-    mkfullname(fullname, fs->dirname, tmpname);
-    assert(fs->nfp->fopen(fullname, "rb"));
-    int len = fmemread_secure(fs->nfp, fs->nastiness, &buffer, 0, -1, checksum);
-    fs->nfp->fclose();
-    free(buffer);
-    return len != -1 && memcmp(checksum, checksum_in, SHA_LEN) == 0;
+    errp("Total Disk Failure sending SOS\n");
+    return false;
 }
 
 // renames TMP file to permanent
@@ -189,7 +176,7 @@ int fmemread_secure(C150NastyFile *nfp, const int nastiness,
     assert(buffer_pp && *buffer_pp == nullptr);
     assert(checksum_out);
 
-    if (offset == 0 && nbytes == -1) {
+    if (offset == 0 && nbytes == -1) {  // if no length spec
         nfp->fseek(0, SEEK_END);
         nbytes = nfp->ftell();
         nfp->fseek(0, SEEK_SET);
@@ -205,17 +192,18 @@ int fmemread_secure(C150NastyFile *nfp, const int nastiness,
         verify(buflen > 0);
 
         SHA1(buffer, buflen, checksums[i]);
-        int matching = 0;
+        int matches = 0;
         for (int j = 0; j < i; j++) {  // for each past checksum
             if (memcmp(checksums[j], checksums[i], SHA_LEN) == 0) {
-                matching++;
+                matches++;
             }
-            // Require nastiness matches to be sure
-            if (matching >= nastiness) {
-                *buffer_pp = buffer;
-                memcpy(checksum_out, checksums[i], SHA_LEN);
-                return buflen;
-            }
+        }
+
+        // Require nastiness matches to be sure
+        if (matches >= nastiness) {
+            *buffer_pp = buffer;
+            memcpy(checksum_out, checksums[i], SHA_LEN);
+            return buflen;
         }
 
         free(buffer);  // free the bad buffer

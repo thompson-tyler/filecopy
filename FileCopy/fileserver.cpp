@@ -7,6 +7,7 @@
 #include "c150grading.h"
 #include "c150nastydgmsocket.h"
 #include "c150nastyfile.h"
+#include "c150network.h"
 #include "cache.h"
 #include "settings.h"
 #include "utils.h"
@@ -15,12 +16,15 @@ using namespace C150NETWORK;
 
 void listen(C150DgmSocket *sock, files_t *files, cache_t *cache) {
     packet_t p;
-    while (true) {
+    while (!sock->timedout()) {
         int len = sock->read((char *)&p, MAX_PACKET_SIZE);
         if (len <= 0 || p.hdr.len != len || p.hdr.seqno < 0) continue;
         bounce(files, cache, &p);
         sock->write((char *)&p, p.hdr.len);
     }
+
+    throw C150NetworkException(
+        "Nothing happened for 20 seconds, ending process");
 }
 
 int main(int argc, char **argv) {
@@ -42,6 +46,7 @@ int main(int argc, char **argv) {
 
     // Set up socket
     C150DgmSocket *sock = new C150NastyDgmSocket(network_nastiness);
+    sock->turnOnTimeouts(1000 * 300);
 
     c150debug->printf(C150APPLICATION,
                       "Set up server socket with nastiness %d\n",
@@ -57,13 +62,13 @@ int main(int argc, char **argv) {
     assert(strnlen(targetdir, MAX_DIRNAME_LENGTH) < MAX_DIRNAME_LENGTH);
     strncpy(fs.dirname, targetdir, MAX_DIRNAME_LENGTH);
 
-    cache_t *cache = cache_new();
+    cache_t cache;
 
     c150debug->printf(C150APPLICATION, "Set up file handler nastiness %d\n",
                       file_nastiness);
 
     try {
-        listen(sock, &fs, cache);
+        listen(sock, &fs, &cache);
     } catch (C150NetworkException &e) {
         // Write to debug log
         c150debug->printf(C150ALWAYSLOG, "Caught C150NetworkException: %s\n",

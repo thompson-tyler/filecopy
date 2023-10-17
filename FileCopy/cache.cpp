@@ -1,6 +1,7 @@
 #include "cache.h"
 
 #include <alloca.h>
+#include <openssl/sha.h>
 
 #include <cstdio>
 #include <cstdlib>
@@ -36,7 +37,8 @@ void bounce(files_t *fs, cache_t *cache, packet_t *p) {
             break;
         case PREPARE_FOR_BLOB:
             is_ack = idempotent_prepareforfile(
-                fs, cache, id, seqno, value->prep.nparts, value->prep.filename);
+                fs, cache, id, seqno, value->prep.filelength,
+                value->prep.nparts, value->prep.filename);
             break;
         case BLOB_SECTION:
             is_ack = idempotent_storesection(
@@ -55,29 +57,17 @@ bool bad_seqno(cache_t *c, int id, int seqno) {
     return c->entries[id].seqno == -1 || c->entries[id].seqno > seqno;
 }
 
-struct entry_t {
-    seq_t seqno;
-    int n_parts;
-    bool *recvparts;
-    bool verified;
-    entry_t() {
-        seqno = -1;
-        n_parts = 0;
-        recvparts = nullptr;
-        verified = false;
-    }
-};
-
 void cache_free(cache_t *cache) {
     assert(cache);
-    for (auto kv_pair : cache->entries) {
-        entry_t *e = kv_pair.second();
-        free(e->recvparts);
-    }
+    for (auto it : cache->entries) {
+        free(it.second.recvparts);
+        free(it.second.buffer);
+    };
 }
 
 bool idempotent_prepareforfile(files_t *fs, cache_t *cache, fid_t id,
-                               seq_t seqno, int n_parts, const char *filename) {
+                               seq_t seqno, int length, int n_parts,
+                               const char *filename) {
     assert(fs && cache);
     if (cache->entries[id].seqno > seqno)
         return SOS;
@@ -92,6 +82,9 @@ bool idempotent_prepareforfile(files_t *fs, cache_t *cache, fid_t id,
     // realloc in case we've already tried
     cache->entries[id].recvparts =
         (bool *)realloc(cache->entries[id].recvparts, sizeof(bool) * n_parts);
+    cache->entries[id].buflen = length;
+    cache->entries[id].buffer =
+        (uint8_t *)realloc(cache->entries[id].buffer, length);
     for (int i = 0; i < n_parts; i++) cache->entries[id].recvparts[i] = false;
 
     // new seqno means we are prepared for file
@@ -110,7 +103,7 @@ bool idempotent_storesection(files_t *fs, cache_t *cache, fid_t id, seq_t seqno,
     // already got it!
     if (cache->entries[id].recvparts[partno]) return ACK;
 
-    files_storetmp(fs, id, offset, len, data);
+    memcpy(cache->entries[id].buffer + offset, data, len);
     cache->entries[id].recvparts[partno] = true;
     return ACK;
 }
@@ -128,24 +121,31 @@ bool idempotent_checkfile(files_t *fs, cache_t *cache, fid_t id, seq_t seqno,
 
     // SOS if missing parts, skipped for new files
     for (int i = 0; i < cache->entries[id].n_parts; i++)
-        if (cache->entries[id].recvparts[i] == false) return SOS;
+        if (cache->entries[id].recvparts[i] == false) {
+            errp("CANNOT CHECK %s because incomplete\n", filename);
+            return SOS;
+        }
 
     // maybe we just checked it
     if (cache->entries[id].seqno == seqno)
         return cache->entries[id].verified ? ACK : SOS;
 
-    errp("CHECKING FILE: %s\n", filename);
-
     // do check
-    cache->entries[id].verified = files_checktmp(fs, id, checksum_in);
+    checksum_t checksum;
+    SHA1(cache->entries[id].buffer, 1, checksum);
+    bool success = memcmp(checksum, checksum_in, SHA_DIGEST_LENGTH) == 0;
+    cache->entries[id].verified = cache->entries[id].verified = success;
 
-    errp("CHECKING SUCCESS: %s\n",
-         cache->entries[id].verified ? "TRUE" : "FALSE");
+    errp("CHECKING SUCCESS: %s\n", cache->entries[id].verified ? "TR" : "FL");
+
+    if (success)
+        success = files_writetmp(fs, id, cache->entries[id].buflen,
+                                 cache->entries[id].buffer, checksum);
 
     // new seqno means we know the answer of end2end check
     cache->entries[id].seqno = seqno;
 
-    return cache->entries[id].verified ? ACK : SOS;
+    return success ? ACK : SOS;
 }
 
 bool idempotent_savefile(files_t *fs, cache_t *cache, fid_t id, seq_t seqno) {

@@ -46,6 +46,7 @@ struct check_is_neccesary_t {
 
 struct prepare_for_blob_t {
     char filename[MAX_FILENAME_LENGTH];
+    int filelength;
     int nparts;
 };
 
@@ -77,7 +78,7 @@ void packet_checkisnecessary(packet_t *p, fid_t id, const char *filename,
                              const checksum_t checksum);
 void packet_keepit(packet_t *p, fid_t id);
 void packet_deleteit(packet_t *p, fid_t id);
-void packet_prepare(packet_t *p, fid_t id, const char *filename,
+void packet_prepare(packet_t *p, fid_t id, const char *filename, int length,
                     uint32_t nparts);
 void packet_section(packet_t *p, fid_t id, uint32_t partno, uint32_t offset,
                     uint32_t size, const uint8_t *data);

@@ -107,14 +107,16 @@ void transfer(files_t *fs, messenger_t *m) {
             throw C150NETWORK::C150NetworkException(
                 "Failed file transfer after MAX SOS COUNT");
         else {
-            errp("got SOS trying again");
+            errp("got SOS trying again\n");
         }
     }
 }
 
 bool end2end(packet_t *check, int id, messenger_t *m) {
+    errp("SENDING RFC:\n%s", check->tostring().c_str());
     bool endtoend = send(m, check, 1);
     packet_t p;
+    endtoend ? errp("SENDING KEEP\n") : errp("SENDING DELETE\n");
     if (endtoend)
         packet_keepit(&p, id);
     else
@@ -127,8 +129,14 @@ bool filesend(packet_t *prep_out, packet_t *sections_out, messenger_t *m) {
     for (int i = 0; i < 5 && i < prep_out->value.prep.nparts; i++) {
         errp("SECTION:\n%s", sections_out[i].tostring().c_str());
     }
-    bool success = send(m, prep_out, 1) &&
-                   send(m, sections_out, prep_out->value.prep.nparts);
+    if (!send(m, prep_out, 1)) {
+        errp("RECEIVED SOS ON PREPARE FILE\n");
+        return false;
+    }
+    if (!send(m, sections_out, prep_out->value.prep.nparts)) {
+        errp("RECEIVED SOS ON SECTIONS\n");
+        return false;
+    }
     free(sections_out);
-    return success;
+    return true;
 }

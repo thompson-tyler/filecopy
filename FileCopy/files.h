@@ -40,9 +40,8 @@ int files_topackets(files_t *fs, int id, packet_t *prep_out,
 // guaranteed safe!
 //
 // stores in TMP file
-void files_storetmp(files_t *fs, int id, int offset, int nbytes,
-                    const void *buffer_in);
-bool files_checktmp(files_t *fs, int id, const checksum_t checksum_in);
+bool files_writetmp(files_t *fs, int id, int nbytes, const void *buffer_in,
+                    const checksum_t checksum_in);
 
 // renames TMP file to permanent
 void files_savepermanent(files_t *fs, int id);
