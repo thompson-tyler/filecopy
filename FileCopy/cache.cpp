@@ -15,7 +15,7 @@ using namespace std;
 
 // bounce :: packet_t -> packet_t
 // Performs incoming packet action and constructs response packet in place.
-void bounce(files_t *fs, cache_t *cache, packet_t *p) {
+void bounce(files_t *fs, cache_t *cache, packet_t *p, long count) {
     bool is_ack = false;
     fid_t id = p->hdr.id;
     seq_t seqno = p->hdr.seqno;
@@ -48,6 +48,7 @@ void bounce(files_t *fs, cache_t *cache, packet_t *p) {
     }
     p->hdr.type = is_ack ? ACK : SOS;
     p->hdr.len = sizeof(p->hdr);
+    p->value.total.totalcount = count;
 }
 
 #define SOS false
@@ -104,14 +105,6 @@ bool idempotent_storesection(files_t *fs, cache_t *cache, fid_t id, seq_t seqno,
     if (cache->entries[id].recvparts[partno]) return ACK;
 
     // write it down!
-    errp("erm copying len %d from offset %d\n", len, offset);
-    checksum_t checksum;
-    SHA1(data, len, checksum);
-
-    cerr << "CHECKSUM MEMCPY" << endl;
-    for (int i = 0; i < SHA_DIGEST_LENGTH; i++) cerr << hex << (int)checksum[i];
-    cerr << endl;
-
     memcpy(cache->entries[id].buffer + offset, data, len);
     cache->entries[id].recvparts[partno] = true;
     return ACK;
@@ -141,23 +134,13 @@ bool idempotent_checkfile(files_t *fs, cache_t *cache, fid_t id, seq_t seqno,
     SHA1(cache->entries[id].buffer, cache->entries[id].buflen, checksum);
     bool success = memcmp(checksum, checksum_in, SHA_DIGEST_LENGTH) == 0;
 
-    cerr << "CHECKSUM BUFFER" << endl;
-    for (int i = 0; i < SHA_DIGEST_LENGTH; i++) cerr << hex << (int)checksum[i];
-    cerr << endl;
-    for (int i = 0; i < SHA_DIGEST_LENGTH; i++)
-        cerr << hex << (int)checksum_in[i];
-    cerr << endl;
-
     // writing can still trigger SOS
-    errp("CHECKING SHAMATCH SUCCESS: %s\n", success ? "TR" : "FL");
-
     if (success) {
         success = files_writetmp(fs, id, cache->entries[id].buflen,
                                  cache->entries[id].buffer, checksum);
-        errp("CHECKING WRITE SUCCESS: %s\n", success ? "TR" : "FL");
     }
-
     cache->entries[id].verified = success;
+    errp("CHECK SUCCEEDED: %s\n", success ? "TR" : "FL");
 
     // new seqno means we know the answer of end2end check
     cache->entries[id].seqno = seqno;

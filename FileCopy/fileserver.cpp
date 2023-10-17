@@ -16,10 +16,11 @@ using namespace C150NETWORK;
 
 void listen(C150DgmSocket *sock, files_t *files, cache_t *cache) {
     packet_t p;
+    long totalcount = 0;
     do {
         int len = sock->read((char *)&p, MAX_PACKET_SIZE);
         if (len <= 0 || p.hdr.len != len || p.hdr.seqno < 0) continue;
-        bounce(files, cache, &p);
+        bounce(files, cache, &p, totalcount++);
         sock->write((char *)&p, p.hdr.len);
     } while (!sock->timedout());
 

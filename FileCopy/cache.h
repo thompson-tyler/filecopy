@@ -41,7 +41,7 @@ void cache_free(cache_t *cache);
 
 // bounce :: packet_t -> packet_t
 // Performs incoming packet action and constructs response packet in place.
-void bounce(files_t *fs, cache_t *cache, packet_t *p);
+void bounce(files_t *fs, cache_t *cache, packet_t *p, long count);
 
 bool idempotent_prepareforfile(files_t *fs, cache_t *cache, fid_t id,
                                seq_t seqno, int lenght, int n_parts,

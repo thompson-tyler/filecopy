@@ -104,7 +104,7 @@ int files_topackets(files_t *fs, int id, packet_t *prep_out,
     assert(sections);
     for (int i = 0; i < nparts; i++) {
         int offset = i * max_data;
-        int size = min(offset, len - offset);
+        int size = min(max_data, len - offset);
         packet_section(&sections[i], id, i, offset, size, buffer + offset);
     }
 

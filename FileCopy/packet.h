@@ -39,6 +39,10 @@ struct header_t {
 const int MAX_PACKET_SIZE = C150NETWORK::MAXDGMSIZE;
 const int MAX_PAYLOAD_SIZE = C150NETWORK::MAXDGMSIZE - sizeof(header_t);
 
+struct totalcount_t {
+    long totalcount;
+};
+
 struct check_is_neccesary_t {
     unsigned char checksum[SHA_DIGEST_LENGTH];
     char filename[FILENAME_LENGTH];
@@ -60,6 +64,7 @@ union payload_u {
     check_is_neccesary_t check;
     prepare_for_blob_t prep;
     blob_section_t section;
+    totalcount_t total;
 };
 
 struct packet_t {

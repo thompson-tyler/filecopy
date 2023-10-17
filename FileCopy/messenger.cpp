@@ -40,7 +40,7 @@ bool send(messenger_t *m, packet_t *packets, int n_packets) {
     int nasty = m->nastiness;
 
     int unanswered = n_packets;
-    for (int resends = RESENDS(nasty); resends > 0; resends--) {
+    for (int resends = RESENDS(nasty); resends > 0 && unanswered; resends--) {
         // send group of unanswered packets
         int sent = 0;
         for (int i = 0; i < n_packets && sent < SEND_GROUP(nastiness); i++) {
@@ -64,18 +64,16 @@ bool send(messenger_t *m, packet_t *packets, int n_packets) {
             }
         } while (!m->sock->timedout() && unanswered);
 
-        if (unanswered <= 0) goto cleanup;
         // cut me some slack, im trying
         if (unanswered_prev > unanswered) resends = RESENDS(nasty);
-
-        errp(
-            "%d remaining resends, after sending %d and reading "
-            "in %d\n",
-            resends, sent, unanswered_prev - unanswered);
+        errp("%d remaining resends, after sending %d and catching %d\n",
+             resends, sent, unanswered_prev - unanswered);
     }
 
-    throw C150NetworkException("Network failure\n");
-
+    if (unanswered) {
+        free(seqmap);
+        throw C150NetworkException("Network failure\n");
+    }
 cleanup:
     free(seqmap);
     return unanswered <= 0;
