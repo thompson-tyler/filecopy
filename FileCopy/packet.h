@@ -13,11 +13,7 @@ typedef unsigned char checksum_t[SHA_DIGEST_LENGTH];
 // All message types, doesn't discriminate on origin of client vs server
 // clang-format off
 enum messagetype_e {
-    // These don't have to be bit flags, but why not?
-    // Original idea was that ACK and SOS preserve 
-    // their incoming messages.
-    //
-    // For now no funny business, just used as normal enum.
+    // SOS & ACK must == 0
     SOS                = 0b10000000, 
     ACK                = 0b01000000,
     CHECK_IS_NECESSARY = 0b00000001, 
@@ -38,10 +34,6 @@ struct header_t {
 
 const int MAX_PACKET_SIZE = C150NETWORK::MAXDGMSIZE;
 const int MAX_PAYLOAD_SIZE = C150NETWORK::MAXDGMSIZE - sizeof(header_t);
-
-struct totalcount_t {
-    long totalcount;
-};
 
 struct check_is_neccesary_t {
     unsigned char checksum[SHA_DIGEST_LENGTH];
@@ -64,7 +56,7 @@ union payload_u {
     check_is_neccesary_t check;
     prepare_for_blob_t prep;
     blob_section_t section;
-    totalcount_t total;
+    int seqmax;
 };
 
 struct packet_t {

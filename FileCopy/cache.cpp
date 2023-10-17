@@ -3,6 +3,7 @@
 #include <alloca.h>
 #include <openssl/sha.h>
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 
@@ -15,43 +16,43 @@ using namespace std;
 
 // bounce :: packet_t -> packet_t
 // Performs incoming packet action and constructs response packet in place.
-void bounce(files_t *fs, cache_t *cache, packet_t *p, long count) {
-    bool is_ack = false;
+void bounce(files_t *fs, cache_t *cache, packet_t *p) {
+    bool rsp_ack = false;
     fid_t id = p->hdr.id;
     seq_t seqno = p->hdr.seqno;
+    cache->seqmax = max(cache->seqmax, p->hdr.seqno);
     payload_u *value = &p->value;
     switch (p->hdr.type) {
         case SOS:
-            is_ack = false;
             break;
         case ACK:
-            is_ack = true;
+            rsp_ack = true;
             break;
         case CHECK_IS_NECESSARY:
-            is_ack = idempotent_checkfile(fs, cache, id, seqno,
-                                          value->check.filename,
-                                          value->check.checksum);
+            rsp_ack = idempotent_checkfile(fs, cache, id, seqno,
+                                           value->check.filename,
+                                           value->check.checksum);
             break;
         case KEEP_IT:
-            is_ack = idempotent_savefile(fs, cache, id, seqno);
+            rsp_ack = idempotent_savefile(fs, cache, id, seqno);
             break;
         case DELETE_IT:
-            is_ack = idempotent_deletefile(fs, cache, id, seqno);
+            rsp_ack = idempotent_deletefile(fs, cache, id, seqno);
             break;
         case PREPARE_FOR_BLOB:
-            is_ack = idempotent_prepareforfile(
+            rsp_ack = idempotent_prepareforfile(
                 fs, cache, id, seqno, value->prep.filelength,
                 value->prep.nparts, value->prep.filename);
             break;
         case BLOB_SECTION:
-            is_ack = idempotent_storesection(
+            rsp_ack = idempotent_storesection(
                 fs, cache, id, seqno, value->section.partno,
                 value->section.offset, p->datalen(), value->section.data);
             break;
     }
-    p->hdr.type = is_ack ? ACK : SOS;
-    p->hdr.len = sizeof(p->hdr) + sizeof(p->value.total);
-    p->value.total.totalcount = count;
+    p->hdr.type = rsp_ack ? ACK : SOS;
+    p->hdr.len = sizeof(p->hdr) + sizeof(p->value.seqmax);
+    p->value.seqmax = cache->seqmax;
 }
 
 #define SOS false

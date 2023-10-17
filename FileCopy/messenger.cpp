@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
+#include <algorithm>
 #include <cstdio>
 
 #include "c150debug.h"
@@ -22,7 +23,7 @@ bool end2end(packet_t *check, int id, messenger_t *m);
 packet_t **assign_sequences(messenger_t *m, packet_t *packets, int n_packets) {
     packet_t **seqmap = (packet_t **)malloc(sizeof(&packets) * n_packets);
     for (int i = 0; i < n_packets; i++) {
-        packets[i].hdr.seqno = m->global_seqcount++;
+        packets[i].hdr.seqno = m->seqcount++;
         seqmap[packets[i].hdr.seqno % n_packets] = &packets[i];
     }
     return seqmap;
@@ -34,7 +35,7 @@ bool send(messenger_t *m, packet_t *packets, int n_packets) {
     assert(n_packets > 0);
 
     // initialize tmp packets and seqmap
-    int minseqno = m->global_seqcount;
+    int minseqno = m->seqcount;
     packet_t **seqmap = assign_sequences(m, packets, n_packets);
     packet_t p;
     int nasty = m->nastiness;
@@ -53,13 +54,14 @@ bool send(messenger_t *m, packet_t *packets, int n_packets) {
 
         do {  // read all incoming
             int len = m->sock->read((char *)&p, MAX_PACKET_SIZE);
-            if (len != p.hdr.len || p.hdr.seqno < minseqno) continue;
-            if (p.hdr.seqno > m->global_seqcount) {  // server already running
-                m->global_seqcount = p.hdr.seqno;    // try to recover
+            if (len != p.hdr.len || p.hdr.seqno < minseqno ||
+                (p.hdr.type & (ACK | SOS)) == 0)
+                continue;
+            if (p.hdr.seqno > m->seqcount ||  // message from future?
+                (p.hdr.type == SOS && seqmap[p.hdr.seqno % n_packets])) {
+                m->seqcount = max(m->seqcount, p.value.seqmax + 1);
                 return free(seqmap), false;
-            } else if (p.hdr.type == SOS && seqmap[p.hdr.seqno % n_packets])
-                return free(seqmap), false;
-            else if (p.hdr.type == ACK && seqmap[p.hdr.seqno % n_packets]) {
+            } else if (p.hdr.type == ACK && seqmap[p.hdr.seqno % n_packets]) {
                 seqmap[p.hdr.seqno % n_packets] = nullptr;
                 unanswered--;
             }

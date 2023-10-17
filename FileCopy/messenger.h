@@ -10,7 +10,7 @@
 struct messenger_t {
     C150NETWORK::C150DgmSocket *sock;
     int nastiness;
-    int global_seqcount;
+    int seqcount;
 };
 
 /* safe UDP send and recv */
