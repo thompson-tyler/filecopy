@@ -37,7 +37,7 @@ int fmemread_naive(NASTYFILE *nfp, uint8_t **buffer_pp);
 char *mkfullname(char *dst, const char *dirname, const char *fname) {
     assert(dst && dirname && fname);
     strncpy(dst, dirname, DIRNAME_LENGTH - 1);
-    strncat(dst, fname, FILENAME_LENGTH);
+    strncat(dst, fname, FILENAME_LENGTH - 1);
     return dst;
 }
 
@@ -53,20 +53,22 @@ void files_register_fromdir(files_t *fs, char *dirname, C150NastyFile *nfp,
     DIR *src = opendir(dirname);
     assert(src);
     struct dirent *file;  // Directory entry for source file
-    for (int id = 0; (file = readdir(src)) != NULL; id++) {
+    int id = 0;
+    while ((file = readdir(src)) != NULL) {
         if ((strcmp(file->d_name, ".") == 0) ||
             (strcmp(file->d_name, "..") == 0))
             continue;  // never copy . or ..
         assert(strnlen(file->d_name, FILENAME_LENGTH) < FILENAME_LENGTH);
         files_register(fs, id, file->d_name, false);
+        id++;
     }
     closedir(src);
 }
 
 bool files_register(files_t *fs, int id, const char *filename, bool allow_new) {
     char fullname[FULLNAME];
-    if (!allow_new && !is_file(mkfullname(fullname, fs->dirname, filename)))
-        return false;
+    mkfullname(fullname, fs->dirname, filename);
+    if (!allow_new && !is_file(fullname)) return false;
     strncpy(fs->files[id].filename, filename, FILENAME_LENGTH);
     errp("REGISTERED FILE: %s as %s with id %d\n", fullname,
          fs->files[id].filename, id);
@@ -85,6 +87,8 @@ int files_topackets(files_t *fs, int id, packet_t *prep_out,
     // read the file
     char fullname[FULLNAME];
     mkfullname(fullname, fs->dirname, filename);
+    if (!is_file(fullname))
+        errp("the name gonna blow is id %d %s %s\n", id, fullname, filename);
     assert(is_file(fullname) && fs->nfp->fopen(fullname, "rb"));
 
     int len = fmemread_secure(fs->nfp, fs->nastiness, &buffer, checksum);

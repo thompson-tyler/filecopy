@@ -32,7 +32,7 @@
 
 # Do all C++ compies with g++
 CPP = g++
-CPPFLAGS = -g -Wall -Werror -I$(C150LIB) -std=c++11 -O3 -Wno-stringop-truncation
+CPPFLAGS = -g -Wall -Werror -I$(C150LIB) -std=c++11 -Wno-stringop-truncation
 
 # Where the COMP 150 shared utilities live, including c150ids.a and userports.csv
 # Note that environment variable COMP117 must be set for this to work!
