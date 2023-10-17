@@ -15,10 +15,24 @@ struct messenger_t {
 
 /* safe UDP send and recv */
 
-/* false if recv SOS : true if recv ACK */
+/*
+ * purpose:
+ *      guarantees that the server received
+ * params:
+ *      ptr to valid array of <n_packets> many packets
+ * returns:
+ *      false if recv SOS : true if recv ACK
+ * */
 bool send(messenger_t *m, packet_t *packets, int n_packets);
 
-/* high level filecopy code */
+/*
+ * purpose:
+ *      send all the filenames in the collection
+ * params:
+ *      ptr to valid array of <n_packets> many packets
+ * returns:
+ *      false if recv SOS : true if recv ACK
+ * */
 void transfer(files_t *fs, messenger_t *m);
 
 #endif

@@ -50,7 +50,7 @@ void setup_logging(const char *logname, int argc, char *argv[]) {
 }
 
 // non crypto hash
-// taken from chatgpt which took from p4c github
+// taken from somewhere inside https://github.com/p4lang/p4c
 unsigned long fnv1a_hash(const void *data, int size) {
     const uint64_t FNV_offset_basis = 14695981039346656037ULL;
     const uint64_t FNV_prime = 1099511628211ULL;

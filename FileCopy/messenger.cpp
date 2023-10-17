@@ -85,11 +85,8 @@ void transfer(files_t *fs, messenger_t *m) {
         int id = it->first;
         packet_t prep, *sections = nullptr, check;
         files_topackets(fs, id, &prep, &sections,
-                        &check);  // allocs sections
-        if (
-#ifndef JUST_END_TO_END
-            filesend(&prep, sections, m) &&  // frees sections
-#endif
+                        &check);             // allocs sections
+        if (filesend(&prep, sections, m) &&  // frees sections
             end2end(&check, id, m))
             attempts = 0, it++;  // onto the next one
         else if (attempts >= MAX_SOS)

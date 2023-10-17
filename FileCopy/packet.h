@@ -16,6 +16,7 @@ enum messagetype_e {
     // SOS & ACK must == 0
     SOS                = 0b10000000, 
     ACK                = 0b01000000,
+    // these don't have to be bitflags, but why not? 
     CHECK_IS_NECESSARY = 0b00000001, 
     KEEP_IT            = 0b00000010,
     DELETE_IT          = 0b00000100,
@@ -25,11 +26,10 @@ enum messagetype_e {
 // clang-format on
 
 struct header_t {
-    // minimum size of whole packet
     messagetype_e type;
-    int len;
-    seq_t seqno = -1;
-    fid_t id;
+    int len;           // length of whole! packet
+    seq_t seqno = -1;  // sequence number is set by messenger_t
+    fid_t id;          // id is determined by files_t
 };
 
 const int MAX_PACKET_SIZE = C150NETWORK::MAXDGMSIZE;
@@ -52,22 +52,26 @@ struct blob_section_t {
     uint8_t data[MAX_PAYLOAD_SIZE - sizeof(partno) - sizeof(offset)];
 };
 
-union payload_u {
-    check_is_neccesary_t check;
-    prepare_for_blob_t prep;
-    blob_section_t section;
-    int seqmax;
+// clang-format off
+union payload_u {                // valid only when type is:
+    check_is_neccesary_t check;  // CHECK_IS_NECESSARY
+    prepare_for_blob_t prep;     // PREPARE_FOR_BLOB
+    blob_section_t section;      // BLOB_SECTION
+    int seqmax;                  // ACK | SOS
 };
+// clang-format on
 
 struct packet_t {
     header_t hdr;
     payload_u value;
-
-    int datalen();          /* blob section data length */
-    std::string tostring(); /* for debugging */
+    int datalen();           // ONLY for BLOB_SECTION!!! data section nbytes
+    std::string tostring();  // for debugging
 };
 
 /* constructors */
+
+// Asserts all input data is valid ptrs and char ptrs are null terminated.
+
 void packet_checkisnecessary(packet_t *p, fid_t id, const char *filename,
                              const checksum_t checksum);
 void packet_keepit(packet_t *p, fid_t id);

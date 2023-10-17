@@ -7,9 +7,6 @@
 /* some of these settings may become easier with increased nastiness */
 #define DISK_RETRIES(nastiness) (5 + 2 * (nastiness))
 
-/* only do end to end check */
-// #define JUST_END_TO_END
-
 // Application settings
 #define CLIENT_TIMEOUT 3000
 #define SERVER_SHUTDOWN_SECONDS 30

@@ -66,10 +66,11 @@ void files_register_fromdir(files_t *fs, char *dirname, C150NastyFile *nfp,
     closedir(src);
 }
 
-bool files_register(files_t *fs, int id, const char *filename, bool allow_new) {
+bool files_register(files_t *fs, int id, const char *filename,
+                    bool allow_touch) {
     char fullname[FULLNAME];
     mkfullname(fullname, fs->dirname, filename);
-    if (!allow_new && !is_file(fullname)) return false;
+    if (!allow_touch && !is_file(fullname)) return false;
     strncpy(fs->files[id].filename, filename, FILENAME_LENGTH);
     errp("REGISTERED FILE: %s as %s with id %u\n", fullname,
          fs->files[id].filename, id);
@@ -152,7 +153,7 @@ bool files_writetmp(files_t *fs, int id, int nbytes, const void *buffer_in,
     return false;
 }
 
-// renames TMP file to permanent
+// renames <dirname>/<filename>.tmp to <dirname>/<filename>
 void files_savepermanent(files_t *fs, int id) {
     char filename[FULLNAME];
     char tmpname[FULLNAME];
@@ -161,7 +162,12 @@ void files_savepermanent(files_t *fs, int id) {
     rename(tmpname, filename);
 }
 
-void files_remove(files_t *fs, int id) { remove(fs->files[id].filename); }
+// removes <dirname>/<filename>.tmp
+void files_remove(files_t *fs, int id) {
+    char tmpname[FULLNAME];
+    mkfullname(tmpname, fs->dirname, mktmpname(fs->files[id].filename));
+    remove(tmpname);
+}
 
 // Brute force secure read
 // Needs to have <nastiness> matching reads
