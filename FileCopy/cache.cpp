@@ -47,7 +47,7 @@ void bounce(files_t *fs, cache_t *cache, packet_t *p, long count) {
             break;
     }
     p->hdr.type = is_ack ? ACK : SOS;
-    p->hdr.len = sizeof(p->hdr);
+    p->hdr.len = sizeof(p->hdr) + sizeof(p->value.total);
     p->value.total.totalcount = count;
 }
 

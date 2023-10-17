@@ -29,6 +29,10 @@ packet_t **assign_sequences(messenger_t *m, packet_t *packets, int n_packets) {
 }
 
 bool send(messenger_t *m, packet_t *packets, int n_packets) {
+    send(m, packets, n_packets, false);
+}
+
+bool send(messenger_t *m, packet_t *packets, int n_packets, bool strict) {
     // sanity checks
     assert(m && packets);
     assert(n_packets > 0);
@@ -53,8 +57,8 @@ bool send(messenger_t *m, packet_t *packets, int n_packets) {
         do {  // read all incoming
             int len = m->sock->read((char *)&p, MAX_PACKET_SIZE);
             if (len != p.hdr.len || p.hdr.seqno < minseqno) continue;
-            if (p.hdr.seqno > m->global_seqcount) {  // try to recover
-                m->global_seqcount = p.hdr.seqno + 1;
+            if (!strict && p.hdr.seqno > m->global_seqcount) {
+                m->global_seqcount = p.hdr.seqno;  // try to recover
                 goto cleanup;
             } else if (p.hdr.type == SOS && seqmap[p.hdr.seqno % n_packets])
                 goto cleanup;

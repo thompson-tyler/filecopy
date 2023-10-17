@@ -16,7 +16,7 @@ struct messenger_t {
 /* safe UDP send and recv */
 
 /* false if recv SOS : true if recv ACK */
-bool send(messenger_t *m, packet_t *packets, int n_packets);
+bool send(messenger_t *m, packet_t *packets, int n_packets, bool strict);
 
 /* high level filecopy code */
 void transfer(files_t *fs, messenger_t *m);
