@@ -16,7 +16,7 @@ using namespace C150NETWORK;
 #define SHA_LEN SHA_DIGEST_LENGTH
 #define FULLNAME (FILENAME_LENGTH + DIRNAME_LENGTH)
 #define mktmpname(fname)                                          \
-    (strcat(strncpy((char *)alloca(FILENAME_LENGTH + 5), (fname), \
+    (strcat(strncpy((char *)alloca(FILENAME_LENGTH + 6), (fname), \
                     FILENAME_LENGTH),                             \
             ".tmp"))
 #define verify(cond) \
@@ -28,10 +28,12 @@ using namespace C150NETWORK;
 int fmemread_secure(C150NastyFile *nfp, const int nastiness,
                     uint8_t **buffer_pp, int offset, int nbytes,
                     unsigned char checksum_out[]);
+
 int fmemread_naive(NASTYFILE *nfp, uint8_t **buffer_pp, int offset, int nbytes);
+
 void mkfullname(char *dst, const char *dirname, const char *fname) {
     assert(dst && dirname && fname);
-    strncpy(dst, dirname, DIRNAME_LENGTH);
+    strncpy(dst, dirname, DIRNAME_LENGTH - 1);
     strncat(dst, fname, FILENAME_LENGTH);
 }
 
@@ -39,7 +41,7 @@ void files_register_fromdir(files_t *fs, char *dirname, C150NastyFile *nfp,
                             int nastiness) {
     assert(fs && dirname && nfp && 0 <= nastiness && nastiness <= 5);
     assert(strnlen(dirname, DIRNAME_LENGTH) < DIRNAME_LENGTH);
-    strncpy(fs->dirname, dirname, DIRNAME_LENGTH);
+    strncpy(fs->dirname, dirname, DIRNAME_LENGTH - 1);
 
     fs->nfp = nfp;
     fs->nastiness = nastiness;
@@ -65,7 +67,7 @@ bool files_register(files_t *fs, int id, const char *filename, bool allow_new) {
     char fullname[FULLNAME];
     mkfullname(fullname, fs->dirname, filename);
     if (!allow_new && !is_file(fullname)) return false;
-    strncpy(fs->files[id].filename, filename, FILENAME_LENGTH);
+    strncpy(fs->files[id].filename, filename, FILENAME_LENGTH - 1);
     errp("REGISTERED FILE: %s as %s with id %d\n", fullname,
          fs->files[id].filename, id);
     return true;

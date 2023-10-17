@@ -89,7 +89,7 @@ void transfer(files_t *fs, messenger_t *m) {
     int n_files = fs->files.size();
     int attempts = 0;
     for (int id = 0; id < n_files; attempts++) {  // <== NOT id++
-        packet_t prep, *sections, check;
+        packet_t prep, *sections = nullptr, check;
         files_topackets(fs, id, &prep, &sections, &check);
         if (
 #ifndef JUST_END_TO_END
@@ -104,8 +104,6 @@ void transfer(files_t *fs, messenger_t *m) {
         else {
             errp("got SOS trying again\n");
         }
-
-        free(sections);
     }
 }
 

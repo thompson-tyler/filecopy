@@ -15,7 +15,7 @@ void packet_checkisnecessary(packet_t *p, fid_t id, const char *filename,
     p->hdr.len = sizeof(p->hdr) + sizeof(p->value.check);
     p->hdr.id = id;
     p->hdr.seqno = -1;
-    strncpy(p->value.check.filename, filename, FILENAME_LENGTH);
+    strncpy(p->value.check.filename, filename, FILENAME_LENGTH - 1);
     memcpy(p->value.check.checksum, checksum, SHA_DIGEST_LENGTH);
 }
 
@@ -41,7 +41,7 @@ void packet_prepare(packet_t *p, fid_t id, const char *filename, int length,
     p->hdr.seqno = -1;
     p->value.prep.filelength = length;
     p->value.prep.nparts = nparts;
-    strncpy(p->value.prep.filename, filename, FILENAME_LENGTH);
+    strncpy(p->value.prep.filename, filename, FILENAME_LENGTH - 1);
 }
 
 void packet_section(packet_t *p, fid_t id, uint32_t partno, uint32_t offset,
@@ -71,7 +71,7 @@ string packet_t::tostring() {
     stringstream ss;
     ss << "---------------\n";
     ss << "Packet\n";
-    ss << "Seqno; " << hdr.seqno << " ID: " << hdr.id << " Len: " << hdr.len
+    ss << "Seqno: " << hdr.seqno << " ID: " << hdr.id << " Len: " << hdr.len
        << endl;
     switch (hdr.type) {
         case SOS:
