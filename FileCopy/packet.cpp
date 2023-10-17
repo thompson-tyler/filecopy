@@ -15,7 +15,7 @@ void packet_checkisnecessary(packet_t *p, fid_t id, const char *filename,
     p->hdr.len = sizeof(p->hdr) + sizeof(p->value.check);
     p->hdr.id = id;
     p->hdr.seqno = -1;
-    strncpy(p->value.check.filename, filename, MAX_FILENAME_LENGTH);
+    strncpy(p->value.check.filename, filename, FILENAME_LENGTH);
     memcpy(p->value.check.checksum, checksum, SHA_DIGEST_LENGTH);
 }
 
@@ -41,7 +41,7 @@ void packet_prepare(packet_t *p, fid_t id, const char *filename, int length,
     p->hdr.seqno = -1;
     p->value.prep.filelength = length;
     p->value.prep.nparts = nparts;
-    strncpy(p->value.prep.filename, filename, MAX_FILENAME_LENGTH);
+    strncpy(p->value.prep.filename, filename, FILENAME_LENGTH);
 }
 
 void packet_section(packet_t *p, fid_t id, uint32_t partno, uint32_t offset,
@@ -59,12 +59,14 @@ void packet_section(packet_t *p, fid_t id, uint32_t partno, uint32_t offset,
 int packet_t::datalen() {
     assert(hdr.type == BLOB_SECTION);
     /*
+     * rearranges this from above
      * len = sizeof hdr + sizeof section + size - sizeof data
      */
     return hdr.len - sizeof(hdr) - sizeof(value.section) +
            sizeof(value.section.data);
 }
 
+// eww c++
 string packet_t::tostring() {
     stringstream ss;
     ss << "---------------\n";
@@ -84,8 +86,7 @@ string packet_t::tostring() {
             ss << "Type: "
                << "Check is necessary\n";
             ss << "Filename: ";
-            for (int i = 0; i < MAX_FILENAME_LENGTH && value.check.filename[i];
-                 i++)
+            for (int i = 0; i < FILENAME_LENGTH && value.check.filename[i]; i++)
                 ss << value.check.filename[i];
             ss << endl;
             ss << "Checksum: ";
@@ -105,8 +106,7 @@ string packet_t::tostring() {
             ss << "Type: "
                << "Prepare for blob\n";
             ss << "Filename: ";
-            for (int i = 0; i < MAX_FILENAME_LENGTH && value.prep.filename[i];
-                 i++)
+            for (int i = 0; i < FILENAME_LENGTH && value.prep.filename[i]; i++)
                 ss << value.prep.filename[i];
             ss << endl;
             ss << "Number of parts: " << value.prep.nparts << endl;

@@ -1,22 +1,26 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-#define MAX_FILENAME_LENGTH 80
-#define MAX_DIRNAME_LENGTH 80
+#define FILENAME_LENGTH 80
+#define DIRNAME_LENGTH 80
 
 /* some of these settings may become easier with increased nastiness */
-#define MAX_DISK_RETRIES 5
+#define DISK_RETRIES(nastiness) (5 + 2 * (nastiness))
 
 /* only do end to end check */
 // #define JUST_END_TO_END
 
-// Messenger settings
+// Application settings
 #define CLIENT_TIMEOUT 3000
-#define MAX_RESEND_ATTEMPTS 10
+#define SERVER_SHUTDOWN_SECONDS 30
+
+// Messenger settings
+#define RESENDS(nastiness) (5 + 3 * (nastiness))
+#define MATCHING_READS(nastiness) (nastiness)
 
 // Number of times the client manager will try to send a file before giving up
-#define MAX_SOS_COUNT 4
+#define MAX_SOS 4
 
-#define MAX_SEND_GROUP 500
+#define SEND_GROUP(nastiness) 500
 
 #endif

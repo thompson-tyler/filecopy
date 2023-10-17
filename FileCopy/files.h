@@ -15,13 +15,13 @@ typedef unsigned char checksum_t[SHA_DIGEST_LENGTH];
 
 // trick the c++ compiler into giving full space
 struct file_entry_t {
-    char filename[MAX_FILENAME_LENGTH] = {0};
+    char filename[FILENAME_LENGTH] = {0};
 };
 
 struct files_t {
     C150NETWORK::C150NastyFile *nfp = nullptr;
     int nastiness = 0;
-    char dirname[MAX_DIRNAME_LENGTH];
+    char dirname[DIRNAME_LENGTH];
     unordered_map<int, file_entry_t> files;
 };
 

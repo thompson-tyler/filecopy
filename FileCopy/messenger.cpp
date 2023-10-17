@@ -25,12 +25,6 @@ bool made_progress(int prev, int curr, int nastiness) {
     return prev > curr;  // bare minimum
 }
 
-// TODO: factor in nastiness
-int throttle(int nel, int nastiness) {
-    (void)nastiness;
-    return nel;
-}
-
 packet_t **assign_sequences(messenger_t *m, packet_t *packets, int n_packets) {
     packet_t **seqmap = (packet_t **)malloc(sizeof(&packets) * n_packets);
     for (int i = 0; i < n_packets; i++) {
@@ -49,15 +43,14 @@ bool send(messenger_t *m, packet_t *packets, int n_packets) {
     int minseqno = m->global_seqcount;
     packet_t **seqmap = assign_sequences(m, packets, n_packets);
     packet_t p;
-    p.hdr.len = -2163;  // makes valgrind happy for some reason
+    p.hdr.len = -2163;  // makes valgrind happy to have an initial value
+    int nastiness = m->nastiness;
 
     int unanswered = n_packets;
-    int max_group = throttle(MAX_SEND_GROUP, m->nastiness);
-    const int MAX_RESENDS = MAX_RESEND_ATTEMPTS + 3 * m->nastiness;
-    for (int resends = MAX_RESENDS; resends > 0; resends--) {
+    for (int resends = RESENDS(nastiness); resends > 0; resends--) {
         // send group of unanswered packets
         int sent = 0;
-        for (int i = 0; i < n_packets && sent < max_group; i++) {
+        for (int i = 0; i < n_packets && sent < SEND_GROUP(nastiness); i++) {
             if (seqmap[i] == nullptr) continue;
             m->sock->write((char *)seqmap[i], seqmap[i]->hdr.len);
             sent++;
@@ -79,8 +72,8 @@ bool send(messenger_t *m, packet_t *packets, int n_packets) {
         if (unanswered == 0) {
             free(seqmap);
             return true;
-        } else if (made_progress(unanswered_prev, unanswered, m->nastiness))
-            resends = MAX_RESENDS;  // earned more slack
+        } else if (made_progress(unanswered_prev, unanswered, nastiness))
+            resends = RESENDS(nastiness);  // earned more slack
 
         errp(
             "have %d remaining resends, after sending %d and reading "
@@ -105,7 +98,7 @@ void transfer(files_t *fs, messenger_t *m) {
             end2end(&check, id, m)) {
             attempts = 0;  // onto the next one
             id++;
-        } else if (attempts >= MAX_SOS_COUNT)
+        } else if (attempts >= MAX_SOS)
             throw C150NETWORK::C150NetworkException(
                 "Failed file transfer after MAX SOS COUNT");
         else {
@@ -130,9 +123,6 @@ bool end2end(packet_t *check, int id, messenger_t *m) {
 
 bool filesend(packet_t *prep_out, packet_t *sections_out, messenger_t *m) {
     errp("SENDING FILE:\n%s", prep_out->tostring().c_str());
-    for (int i = 0; i < 5 && i < prep_out->value.prep.nparts; i++) {
-        errp("SECTION:\n%s", sections_out[i].tostring().c_str());
-    }
     if (!send(m, prep_out, 1)) {
         errp("RECEIVED SOS ON PREPARE FILE\n");
         return false;

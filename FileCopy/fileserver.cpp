@@ -43,9 +43,11 @@ int main(int argc, char **argv) {
     int file_nastiness = atoi(argv[2]);
     char *targetdir = argv[3];
 
+    check_directory(argv[3]);
+
     // Set up socket
     C150DgmSocket *sock = new C150NastyDgmSocket(network_nastiness);
-    sock->turnOnTimeouts(1000 * 60);
+    sock->turnOnTimeouts(1000 * SERVER_SHUTDOWN_SECONDS);
 
     c150debug->printf(C150APPLICATION,
                       "Set up server socket with nastiness %d\n",
@@ -58,8 +60,8 @@ int main(int argc, char **argv) {
     files_t fs;
     fs.nfp = nfp;
     fs.nastiness = file_nastiness;
-    assert(strnlen(targetdir, MAX_DIRNAME_LENGTH) < MAX_DIRNAME_LENGTH);
-    strncpy(fs.dirname, targetdir, MAX_DIRNAME_LENGTH);
+    assert(strnlen(targetdir, DIRNAME_LENGTH) < DIRNAME_LENGTH);
+    strncpy(fs.dirname, targetdir, DIRNAME_LENGTH);
 
     cache_t cache;
 

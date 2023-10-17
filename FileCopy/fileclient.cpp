@@ -18,6 +18,7 @@ using namespace C150NETWORK;
 using namespace std;
 
 int main(int argc, char **argv) {
+    // TODO: uncomment
     // GRADEME(argc, argv);
     setup_logging("clientlog.txt", argc, argv);
 
@@ -54,8 +55,6 @@ int main(int argc, char **argv) {
     files_register_fromdir(&fs, srcdir, nfp, file_nastiness);
 
     try {
-        // Send files
-        errp("starting transfer\n");
         transfer(&fs, &messenger);
     } catch (C150Exception &e) {
         cerr << "fileclient: Caught C150Exception: " << e.formattedExplanation()

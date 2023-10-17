@@ -41,11 +41,11 @@ const int MAX_PAYLOAD_SIZE = C150NETWORK::MAXDGMSIZE - sizeof(header_t);
 
 struct check_is_neccesary_t {
     unsigned char checksum[SHA_DIGEST_LENGTH];
-    char filename[MAX_FILENAME_LENGTH];
+    char filename[FILENAME_LENGTH];
 };
 
 struct prepare_for_blob_t {
-    char filename[MAX_FILENAME_LENGTH];
+    char filename[FILENAME_LENGTH];
     int filelength;
     int nparts;
 };
