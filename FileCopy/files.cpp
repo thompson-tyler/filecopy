@@ -62,11 +62,10 @@ void files_register_fromdir(files_t *fs, char *dirname, C150NastyFile *nfp,
 bool files_register(files_t *fs, int id, const char *filename, bool allow_new) {
     char fullname[FULLNAME];
     mkfullname(fullname, fs->dirname, filename);
-    errp("tryna REGISTERED FILE: %s\n", fullname);
     if (!allow_new && !is_file(fullname)) return false;
+    strncpy(fs->files[id].filename, filename, MAX_FILENAME_LENGTH);
     errp("REGISTERED FILE: %s as %s with id %d\n", fullname,
          fs->files[id].filename, id);
-    strncpy(fs->files[id].filename, filename, MAX_FILENAME_LENGTH);
     return true;
 }
 
@@ -129,22 +128,22 @@ bool files_writetmp(files_t *fs, int id, int nbytes, const void *buffer_in,
     mkfullname(tmpname, fs->dirname, mktmpname(fs->files[id].filename));
     assert(fs->nfp->fopen(tmpname, "w+b"));
 
-    uint8_t *buffer = nullptr;
     checksum_t checksum_out;
 
     int attempts = 0;
     do {
+        uint8_t *buffer = nullptr;
         fs->nfp->fseek(0, SEEK_SET);
         fs->nfp->fwrite(buffer_in, 1, nbytes);
         int len = fmemread_secure(fs->nfp, fs->nastiness, &buffer, 0, -1,
                                   checksum_out);
-        assert(len == nbytes);
+        if (len != nbytes) return false;
         free(buffer);
         if (memcmp(checksum_in, checksum_out, SHA_LEN) == 0) {
             fs->nfp->fclose();
             return true;
         }
-    } while (++attempts < MAX_DISK_RETRIES + fs->nastiness);
+    } while (++attempts < MAX_DISK_RETRIES + fs->nastiness * 2);
 
     errp("Total Disk Failure sending SOS\n");
     return false;
@@ -173,7 +172,7 @@ void files_remove(files_t *fs, int id) { remove(fs->files[id].filename); }
 int fmemread_secure(C150NastyFile *nfp, const int nastiness,
                     uint8_t **buffer_pp, int offset, int nbytes,
                     unsigned char checksum_out[]) {
-    assert(buffer_pp && *buffer_pp == nullptr);
+    verify(buffer_pp && *buffer_pp == nullptr);
     assert(checksum_out);
 
     if (offset == 0 && nbytes == -1) {  // if no length spec
@@ -184,8 +183,10 @@ int fmemread_secure(C150NastyFile *nfp, const int nastiness,
 
     assert(offset >= 0 && nbytes > 0);
 
-    auto checksums = new unsigned char[MAX_DISK_RETRIES + nastiness][SHA_LEN];
-    for (int i = 0; i < MAX_DISK_RETRIES + nastiness; i++) {  // for each try
+    int retries = MAX_DISK_RETRIES + nastiness * 2;
+
+    auto checksums = new unsigned char[retries][SHA_LEN];
+    for (int i = 0; i < retries; i++) {  // for each try
         uint8_t *buffer = nullptr;
         int buflen = fmemread_naive(nfp, &buffer, offset, nbytes);
         assert(buffer);
@@ -203,6 +204,7 @@ int fmemread_secure(C150NastyFile *nfp, const int nastiness,
         if (matches >= nastiness) {
             *buffer_pp = buffer;
             memcpy(checksum_out, checksums[i], SHA_LEN);
+            delete[] checksums;
             return buflen;
         }
 
@@ -213,6 +215,7 @@ int fmemread_secure(C150NastyFile *nfp, const int nastiness,
     fprintf(stderr,
             "Disk failure -- unable to reliably open file in %d attempts\n",
             MAX_DISK_RETRIES);
+    delete[] checksums;
     return -1;
 }
 

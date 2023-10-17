@@ -52,7 +52,8 @@ bool send(messenger_t *m, packet_t *packets, int n_packets) {
 
     int unanswered = n_packets;
     int max_group = throttle(MAX_SEND_GROUP, m->nastiness);
-    for (int resends = MAX_RESEND_ATTEMPTS; resends > 0; resends--) {
+    const int MAX_RESENDS = MAX_RESEND_ATTEMPTS + 3 * m->nastiness;
+    for (int resends = MAX_RESENDS; resends > 0; resends--) {
         // send group of unanswered packets
         int sent = 0;
         for (int i = 0; i < n_packets && sent < max_group; i++) {
@@ -78,7 +79,7 @@ bool send(messenger_t *m, packet_t *packets, int n_packets) {
             free(seqmap);
             return true;
         } else if (made_progress(unanswered_prev, unanswered, m->nastiness))
-            resends = MAX_RESEND_ATTEMPTS;  // earned more slack
+            resends = MAX_RESENDS;  // earned more slack
 
         errp(
             "have %d remaining resends, after sending %d and reading "
@@ -109,6 +110,8 @@ void transfer(files_t *fs, messenger_t *m) {
         else {
             errp("got SOS trying again\n");
         }
+
+        free(sections);
     }
 }
 

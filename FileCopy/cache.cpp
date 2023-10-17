@@ -132,7 +132,7 @@ bool idempotent_checkfile(files_t *fs, cache_t *cache, fid_t id, seq_t seqno,
 
     // do check
     checksum_t checksum;
-    SHA1(cache->entries[id].buffer, 1, checksum);
+    SHA1(cache->entries[id].buffer, cache->entries[id].buflen, checksum);
     bool success = memcmp(checksum, checksum_in, SHA_DIGEST_LENGTH) == 0;
     cache->entries[id].verified = cache->entries[id].verified = success;
 
