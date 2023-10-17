@@ -49,6 +49,7 @@ bool send(messenger_t *m, packet_t *packets, int n_packets) {
     int minseqno = m->global_seqcount;
     packet_t **seqmap = assign_sequences(m, packets, n_packets);
     packet_t p;
+    p.hdr.len = -2163;  // makes valgrind happy for some reason
 
     int unanswered = n_packets;
     int max_group = throttle(MAX_SEND_GROUP, m->nastiness);
