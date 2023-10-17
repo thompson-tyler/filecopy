@@ -87,8 +87,6 @@ int files_topackets(files_t *fs, int id, packet_t *prep_out,
     // read the file
     char fullname[FULLNAME];
     mkfullname(fullname, fs->dirname, filename);
-    if (!is_file(fullname))
-        errp("the name gonna blow is id %d %s %s\n", id, fullname, filename);
     assert(is_file(fullname) && fs->nfp->fopen(fullname, "rb"));
 
     int len = fmemread_secure(fs->nfp, fs->nastiness, &buffer, checksum);
@@ -140,7 +138,7 @@ bool files_writetmp(files_t *fs, int id, int nbytes, const void *buffer_in,
         fs->nfp->fseek(0, SEEK_SET);
         fs->nfp->fwrite(buffer_in, 1, nbytes);
         int len = fmemread_secure(fs->nfp, fs->nastiness, &buffer, checksum);
-        if (len != nbytes) return false;
+        assert(len == nbytes);
         free(buffer);
         if (memcmp(checksum_in, checksum, SHA_LEN) == 0) {
             fs->nfp->fclose();
@@ -149,6 +147,7 @@ bool files_writetmp(files_t *fs, int id, int nbytes, const void *buffer_in,
     } while (++attempts < DISK_RETRIES(fs->nastiness));
 
     errp("Total Disk Failure sending SOS\n");
+    fs->nfp->fclose();
     return false;
 }
 
