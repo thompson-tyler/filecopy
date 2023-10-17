@@ -99,3 +99,17 @@ void setup_logging(const char *logname, int argc, char *argv[]) {
     c150debug->enableLogging(C150APPLICATION | C150NETWORKTRAFFIC |
                              C150NETWORKDELIVERY);
 }
+
+// non crypto hash
+// taken from chatgpt which took from p4c github
+unsigned long fnv1a_hash(const void *data, int size) {
+    const uint64_t FNV_offset_basis = 14695981039346656037ULL;
+    const uint64_t FNV_prime = 1099511628211ULL;
+    const unsigned char *bytes = (const unsigned char *)data;
+    uint64_t hash = FNV_offset_basis;
+    for (int i = 0; i < size; ++i) {
+        hash ^= bytes[i];
+        hash *= FNV_prime;
+    }
+    return (unsigned long)hash;
+}

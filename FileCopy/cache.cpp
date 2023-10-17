@@ -22,8 +22,11 @@ void bounce(files_t *fs, cache_t *cache, packet_t *p, long count) {
     payload_u *value = &p->value;
     switch (p->hdr.type) {
         case SOS:
+            is_ack = false;
+            break;
         case ACK:
-            return;
+            is_ack = true;
+            break;
         case CHECK_IS_NECESSARY:
             is_ack = idempotent_checkfile(fs, cache, id, seqno,
                                           value->check.filename,

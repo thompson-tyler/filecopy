@@ -29,10 +29,6 @@ packet_t **assign_sequences(messenger_t *m, packet_t *packets, int n_packets) {
 }
 
 bool send(messenger_t *m, packet_t *packets, int n_packets) {
-    send(m, packets, n_packets, false);
-}
-
-bool send(messenger_t *m, packet_t *packets, int n_packets, bool strict) {
     // sanity checks
     assert(m && packets);
     assert(n_packets > 0);
@@ -44,7 +40,7 @@ bool send(messenger_t *m, packet_t *packets, int n_packets, bool strict) {
     int nasty = m->nastiness;
 
     int unanswered = n_packets;
-    for (int resends = RESENDS(nasty); resends > 0 && unanswered; resends--) {
+    for (int resends = RESENDS(nasty); resends && unanswered; resends--) {
         // send group of unanswered packets
         int sent = 0;
         for (int i = 0; i < n_packets && sent < SEND_GROUP(nastiness); i++) {
@@ -54,14 +50,15 @@ bool send(messenger_t *m, packet_t *packets, int n_packets, bool strict) {
         }
 
         int unanswered_prev = unanswered;
+
         do {  // read all incoming
             int len = m->sock->read((char *)&p, MAX_PACKET_SIZE);
             if (len != p.hdr.len || p.hdr.seqno < minseqno) continue;
-            if (!strict && p.hdr.seqno > m->global_seqcount) {
-                m->global_seqcount = p.hdr.seqno;  // try to recover
-                goto cleanup;
+            if (p.hdr.seqno > m->global_seqcount) {  // server already running
+                m->global_seqcount = p.hdr.seqno;    // try to recover
+                return free(seqmap), false;
             } else if (p.hdr.type == SOS && seqmap[p.hdr.seqno % n_packets])
-                goto cleanup;
+                return free(seqmap), false;
             else if (p.hdr.type == ACK && seqmap[p.hdr.seqno % n_packets]) {
                 seqmap[p.hdr.seqno % n_packets] = nullptr;
                 unanswered--;
@@ -74,29 +71,26 @@ bool send(messenger_t *m, packet_t *packets, int n_packets, bool strict) {
              resends, sent, unanswered_prev - unanswered);
     }
 
-    if (unanswered) {
-        free(seqmap);
-        throw C150NetworkException("Network failure\n");
-    }
-cleanup:
     free(seqmap);
-    return unanswered <= 0;
+    if (unanswered) throw C150NetworkException("Network failure\n");
+    return true;
 }
 
 void transfer(files_t *fs, messenger_t *m) {
-    int n_files = fs->files.size();
     int attempts = 0;
-    for (int id = 0; id < n_files; attempts++) {  // <== IMPORTANT! NOT id++
+    auto files = fs->files;
+    for (auto it = files.begin(); it != files.end(); attempts++) {  // <== !!
+        int id = it->first;
         packet_t prep, *sections = nullptr, check;
-        files_topackets(fs, id, &prep, &sections, &check);  // allocs sections
+        files_topackets(fs, id, &prep, &sections,
+                        &check);  // allocs sections
         if (
 #ifndef JUST_END_TO_END
             filesend(&prep, sections, m) &&  // frees sections
 #endif
-            end2end(&check, id, m)) {
-            attempts = 0;  // onto the next one
-            id++;
-        } else if (attempts >= MAX_SOS)
+            end2end(&check, id, m))
+            attempts = 0, it++;  // onto the next one
+        else if (attempts >= MAX_SOS)
             throw C150NetworkException("Hit SOS MAX. Transfer failed");
         else
             errp("got SOS trying again\n");

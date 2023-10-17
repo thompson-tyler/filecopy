@@ -45,10 +45,10 @@ void files_register_fromdir(files_t *fs, char *dirname, C150NastyFile *nfp,
                             int nastiness) {
     assert(fs && dirname && nfp && 0 <= nastiness && nastiness <= 5);
     assert(strnlen(dirname, DIRNAME_LENGTH) < DIRNAME_LENGTH);
-    strncpy(fs->dirname, dirname, DIRNAME_LENGTH - 1);
 
     fs->nfp = nfp;
     fs->nastiness = nastiness;
+    strncpy(fs->dirname, dirname, DIRNAME_LENGTH - 1);
 
     DIR *src = opendir(dirname);
     assert(src);
@@ -58,9 +58,10 @@ void files_register_fromdir(files_t *fs, char *dirname, C150NastyFile *nfp,
         if ((strcmp(file->d_name, ".") == 0) ||
             (strcmp(file->d_name, "..") == 0))
             continue;  // never copy . or ..
-        assert(strnlen(file->d_name, FILENAME_LENGTH) < FILENAME_LENGTH);
-        files_register(fs, id, file->d_name, false);
-        id++;
+        int namelen = strnlen(file->d_name, FILENAME_LENGTH);
+        assert(namelen < FILENAME_LENGTH);
+        id = (int)fnv1a_hash(file->d_name, namelen);
+        files_register(fs, id++, file->d_name, false);
     }
     closedir(src);
 }
@@ -70,7 +71,7 @@ bool files_register(files_t *fs, int id, const char *filename, bool allow_new) {
     mkfullname(fullname, fs->dirname, filename);
     if (!allow_new && !is_file(fullname)) return false;
     strncpy(fs->files[id].filename, filename, FILENAME_LENGTH);
-    errp("REGISTERED FILE: %s as %s with id %d\n", fullname,
+    errp("REGISTERED FILE: %s as %s with id %u\n", fullname,
          fs->files[id].filename, id);
     return true;
 }
