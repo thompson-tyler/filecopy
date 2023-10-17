@@ -35,48 +35,60 @@ Any _smartness_ is an optimization.
 ### Packet Structure
 
 ```
-| HEADER ...                  | DATA ...                                   |
-| i32 msg | i32 seq | u32 len | DATA ...                                   |
-| SOS     | i32 seq | u32 len | i32 id |                                   |
-| ACK     | i32 seq | u32 len | i32 id |                                   |
-| PREPARE | i32 seq | u32 len | i32 id | i8[80] filename | u32 nparts      |
-| SECTION | i32 seq | u32 len | i32 id | u32 partno | u8[len - 8] data     |
-| CHECK   | i32 seq | u32 len | i32 id | i8[80] filename | u8[20] checksum |
-| KEEP    | i32 seq | u32 len | i32 id |                                   |
-| DELETE  | i32 seq | u32 len | i32 id |                                   |
+| HEADER                                | DATA
+| i32 type | i32 len | i32 seq | i32 id |
+| -------- | ------- | ------- | ------ | --------------- | --------------- | ------------ |
+| SOS      | i32 len | i32 seq | i32 id |                 |                 |              |
+| ACK      | i32 len | i32 seq | i32 id |                 |                 |              |
+| PREPARE  | i32 len | i32 seq | i32 id | i8[80] filename | i32 filelength  | i32 nparts   |
+| SECTION  | i32 len | i32 seq | i32 id | i32 partno      | i32 offset      | u8[488] data |
+| CHECK    | i32 len | i32 seq | i32 id | u8[20] checksum | i8[80] filename |              |
+| KEEP     | i32 len | i32 seq | i32 id |                 |                 |              |
+| DELETE   | i32 len | i32 seq | i32 id |                 |                 |              |
 ```
 
-- `seq` is the sequence number created by the `Messenger`
+- `len` is the length of the entire packet in bytes 
 
-- `len` is the length of the data
+- `seq` is the sequence number assigned by the `Messenger`, and newer packets
+  must have higher sequence numbers than older packets 
 
-- `id` is unique to each file, not each packet
+- `id` is a unique identifier assigned to each file, not each packet. They are
+  assigned sequentially but it doesn't matter how they're assigned, they only
+  need to be unique
 
-- `SOS` is always constructed as a response to a previous packet. To construct
-  an SOS we only set a special bitflag, modifying the incoming packet in place.
-  Receiving an SOS triggers the healing mechanism.
+- `SOS` is constructed by the server as a response to a previous packet. SOS
+  packets are constructed by sending the incoming packet back to the client with
+  the type value changed to `SOS`. SOS packets trigger the client to reset
+  whatever process prompted the SOS - this is the self healing mechanism.
 
-- `ACK` is constructed the same as SOS. It notifies its receiver that
-  the requested action with a matching `seqno` was performed.
+- `ACK` is constructed the same as SOS. It notifies the client that the
+  requested action with a matching `seqno` was performed successfully. The
+  client will continue resending packets until it receives an ACK for them.
 
 - `PREPARE` is sent to indicate to the server to get ready for a file separated
-  into nparts, and so the server will associate the `filename` with the `id`.
+  into `nparts` sections, totalling `filelength` bytes. The server will
+  associate the `filename` with the `id` and be capable of receiving `SECTION`
+  packets to reconstruct the indicated file.
 
-- `SECTION` is a section of a file, identified by its `partno`
+- `SECTION` is a section of a file, identified by its `partno` and placed in
+  buffer at `offset`. The server expects that it had previously received a
+  `PREPARE` packet for the indicated `id`.
 
-- `CHECK` tells us that an end to end check is necessary,
-  providing a filename in addition to the id,
-  just in case the server doesn't know the association file for the id
+- `CHECK` tells the server that an end to end check for a specific file is
+  necessary. The server will ensure it received all the file's sections, then
+  hash the file and compare it to `checksum`. Both `filename` and `id` are
+  provided so that the client can also request a `CHECK` for a file that the
+  target directory contained a priori. An ACK is sent if the file is intact. SOS
+  is sent if the file is damaged, triggering a retransmission of that file.
 
-- `KEEP` tells the server to save the file matching an `id`
+- `KEEP` tells the server to save the file matching an `id` to disk
 
 - `DELETE` tells the server to delete the file matching an `id`
 
-It is always assumed that these messages come in any order—valid or not—and
-that both server or client can correspond an action to any of these.
+It is always assumed that these messages come in any order and may be duplicated.
 
-There are two objects `Packet` and `Message`, which can convert from one another
-and handle serialization, deserialization and creation of the messages above.
+The `Packet` data structure is represented as a `struct` and written to be
+easily serializable.
 
 # Objects and Modules
 
