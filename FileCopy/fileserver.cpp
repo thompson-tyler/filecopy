@@ -28,8 +28,10 @@ void listen(C150DgmSocket *sock, files_t *files, cache_t *cache) {
 }
 
 int main(int argc, char **argv) {
+    // TODO: test and handle directories missing the '/'
     // TODO: uncomment
     // GRADEME(argc, argv);
+
     setup_logging("serverlog.txt", argc, argv);
 
     if (argc != 4) {

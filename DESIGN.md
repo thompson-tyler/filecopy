@@ -1,4 +1,9 @@
-# Design Document for Remote File Copy
+---
+header-includes:
+  - \usepackage{setspace}
+---
+
+# Report for Remote File Copy
 
 ### CS117 Jacob Zimmerman and Tyler Thompson
 
@@ -15,19 +20,33 @@ from Joe Armstrong who developed the Erlang BEAM machine:
 _‘It was during this conference that we realised that the work we were doing on Erlang was very different from a lot of mainstream work in telecommunications programming. Our major concern at the time was with detecting and recovering from errors. I remember Mike, Robert and I having great fun asking the same question over and over again: "what happens if it fails?" -- the answer we got was almost always a variant on "our model assumes no failures." We seemed to be the only people in the world designing a system that could recover from software failures.’_
 
 Rather than build an intricate, robust system to prevent failure,
-the goal of this system is to have everything be simple enough that failures can be self-healing.
-Allowing us to prioritize objects that are _stupid_ rather than _smart_.
+the goal of this system is to have everything be simple enough that failures can be **self-healing**.
+Allowing us to prioritize designs that are _stupid_ rather than _smart_.
 
-Any _smartness_ is an optimization.
+In our system _smartness_ is an optimization.
+
+Because of this, our system is inherently agnostic to chronology.
+Files could be tranferred concurrently. In fact
+**both** the client and server processes can be killed and restarted
+at any point in a single file transfer, and the protocol is able to heal and
+succeed.\*
+
+We spent a whole week devising this system before writing any code, and once
+we had all our stupid `C++` bugs sorted, it worked pretty much first time.
+
+\*Adding this feature to our initial design took only 4 extra lines of code,
+the power of _stupidity_.
+
+### Successful cases
+
+We think it handles all nastiness, **except** issues with long directory and file
+names, or directories that don't end in '`/`'—basically we used C style strings.
 
 #### Some terminology
 
+- **Smart** vs **stupid** is another way of saying selfconscious vs unselfconscious
 - A **message** is a requested action that is conveyed over a network
-- A **method** is a function on a C++ object.
-  Though our objects use a _message passing_ style,
-  we use the term method to avoid confusion.
 - A **id** is a number that we associate with a filename
-- An **object** is a C++ object
 - A **module** is a set of related functions
 
 # Modules
@@ -36,20 +55,32 @@ Any _smartness_ is an optimization.
 
 This module defines the structs representing packets as defined below, as well
 as a number of functions used to easily construct those packets. All packets are
-easily sent over the network because they contain no pointers, and as such can
-be serialized easily.
+easily sent over the network because they are implemented as tagged unions
+which contain no pointers, therefore they are serialized and deserialized
+easily via C-style casts.
 
 ## The `files` module
 
 Provides functions to reliably read files from disk and a data structure
-`files_t` which stores metadata of the files on disk. This module uses a nasty
-file pointer under the hood, but provides the user with reliable reads by
-repeatedly reading a file, hashing it, and comparing the it to previous hashes
-until there are a sufficient number of matching hashes. Then all the packets
-necessary to transfer the file are returned to the caller.
+`files_t` which stores metadata of the files on disk, it doesn't store file contents.
 
-This module adapts to the nastiness level by reading files a greater number of
-times under larger nastiness values.
+This module uses a nasty file pointer under the hood, but provides the user with reliable reads by
+repeatedly reading a file, hashing it, and comparing the it to previous hashes
+until there are a sufficient number of matching hashes.
+
+It uses this functionality to convert a file stream into the all the necessary packets
+to transfer the file, including correct checksum.
+
+This module **adapts** to the nastiness level by requiring 5 matching reads for `nastiness` 5,
+4 for `nastiness` 4, etc...
+
+At a certain point, which is also adaptive to `nastiness`,
+the read will give up and declare an unfixable disk error, which will try to trigger an SOS.
+
+For write functionality, we again repeatedly write, then read and hash to ensure the write was correct.
+
+It is a sort of personal end to end just for disk IO. Though,
+it's still separate to the real end to end, and is no more than an optimization instead of resending.
 
 ## The `messenger` module
 
@@ -57,29 +88,65 @@ Contains functions to reliably send packets over the network or send a
 collection of files to the server. A `messenger_t` struct must be initialized
 with a "nasty socket" and the nastiness used for that socket. The messenger
 functions will adapt to the nastiness level and allow for a greater number of
-retries under higher nastiness levels.
+retries under higher nastiness levels. It also contains a monotonically
+increasing (though not necessarily linear), sequence counter used to order
+each outgoing packet.
+
+Sending via a `messenger` _guarantees_ that the receiver has responded,
+and is aware of the message.
 
 The module has functions to send either an array of packets or a `files_t`
 instance containing files to send. The file sending function utilizes the packet
 sending function, but first splits the files up and sends the whole sequence of
 packets necessary to fully transfer each file.
 
+As long as the protocol is followed multiple files could be transferred
+concurrently, though we don't actually do this.
+
 Both packet sending and file sending give a best effort attempt, and fail after
-a certain number of retries.
+a certain number of retries, the number of retries is adaptive to
+network `nastiness`.
 
 After a file is sent, this module also performs an end-to-end check for that
 file by hashing it and asking the server to compare the hashes. If the check
 fails, then the transfer is retried until it succeeds, or retry threshold is
 hit.
 
+If a message that is sent is responded with via an `SOS`, the transfer of that
+file restarts.
+
 ## The `cache` module
+
+This module takes inspiration from walls (which are underappreciated).
+It provides one real function called `bounce` that takes in a packet,
+tries to perform the requested action, and returns a new packet `ACK` if
+the action was successful, and `SOS` otherwise.
 
 This module is meant to be used entirely by the server, and is used to interpret
 and act on incoming packets. It provides a number of idempotent functions which
-correspond to the various packet types. These functions are designed to be
+correspond to the actions requested by various packet types.
+These functions are designed to be
 called multiple times safely so that duplicate packets have no adverse effect.
 This is achieved with a combination of checking sequence numbers and checking
 file status.
+
+Based on inferring the `cache`'s responses, a client can estimate the current
+state of the server. The server does not know it's own state, and is therefore
+unselfconscious and **stupid**.
+
+There are internal optimizations to prevent repeated work that do not violate
+the idempotence of each action.
+
+### The `listen` function
+
+`listen` is the main server function, it is a loop that does the following:
+
+- read a packet
+- `bounce` the packet against the cache
+- respond with the same packet metadata plus a copy of the highest recorded sequence
+  number that the server has received\*
+
+\* This is used as part of the self healing for recovering from and old process
 
 # The protocol
 
@@ -94,7 +161,6 @@ together to transfer files:
 - `CHECK`
 - `KEEP`
 - `DELETE`
-
 
 ### 1. Prepare for file
 
@@ -126,12 +192,13 @@ Once a file is checked
 
 ## Packet Structure
 
+\small
+
 ```
-| HEADER                                | DATA
-| i32 type | i32 len | i32 seq | i32 id |
-| -------- | ------- | ------- | ------ | --------------- | --------------- | ------------ |
-| SOS      | i32 len | i32 seq | i32 id |                 |                 |              |
-| ACK      | i32 len | i32 seq | i32 id |                 |                 |              |
+| i32 type | HEADER                     | DATA                                             |
+| -------- | -------------------------- | ------------------------------------------------ |
+| SOS      | i32 len | i32 seq | i32 id | i32 maxseq      |                 |              |
+| ACK      | i32 len | i32 seq | i32 id | i32 maxseq      |                 |              |
 | PREPARE  | i32 len | i32 seq | i32 id | i8[80] filename | i32 file length | i32 nparts   |
 | SECTION  | i32 len | i32 seq | i32 id | i32 partno      | i32 offset      | u8[488] data |
 | CHECK    | i32 len | i32 seq | i32 id | u8[20] checksum | i8[80] filename |              |
@@ -139,10 +206,12 @@ Once a file is checked
 | DELETE   | i32 len | i32 seq | i32 id |                 |                 |              |
 ```
 
-- `len` is the length of the entire packet in bytes 
+\normalsize
+
+- `len` is the length of the entire packet in bytes
 
 - `seq` is the sequence number assigned by the `Messenger`, and newer packets
-  must have higher sequence numbers than older packets 
+  must have higher sequence numbers than older packets
 
 - `id` is a unique identifier assigned to each file, not each packet. They are
   assigned sequentially but it doesn't matter how they're assigned, they only
@@ -151,7 +220,8 @@ Once a file is checked
 - `SOS` is constructed by the server as a response to a previous packet. SOS
   packets are constructed by sending the incoming packet back to the client with
   the type value changed to `SOS`. SOS packets trigger the client to reset
-  whatever process prompted the SOS - this is the self healing mechanism.
+  whatever process prompted the SOS - this is the self healing mechanism. An
+  `SOS` has a matching `seqno` to the packet that triggered it.
 
 - `ACK` is constructed the same as SOS. It notifies the client that the
   requested action with a matching `seqno` was performed successfully. The
@@ -170,21 +240,24 @@ Once a file is checked
   necessary. The server will ensure it received all the file's sections, then
   hash the file and compare it to `checksum`. Both `filename` and `id` are
   provided so that the client can also request a `CHECK` for a file that the
-  target directory contained a priori. An ACK is sent if the file is intact. SOS
+  target directory contained a priori. An ACK is sent if the file is correct
+  and stored in a `.tmp` file. SOS
   is sent if the file is damaged, triggering a retransmission of that file.
 
-- `KEEP` tells the server to save the file matching an `id` to disk
+- `KEEP` tells the server to save the `.tmp` file matching an `id` to disk
 
-- `DELETE` tells the server to delete the file matching an `id`
+- `DELETE` tells the server to delete the `.tmp` file matching an `id`
 
 It is always assumed that these messages come in any order and may be duplicated.
 
 The `Packet` data structure is represented as a `struct` and written to be
 easily serializable.
 
+## Gradelogs
 
+**TODO**
 
-<!-- 
+<!--
 ### The `files` Module
 
 There are two utility functions here for remedying the nastyfile hard drive
