@@ -66,8 +66,8 @@ nastyfiletest: nastyfiletest.cpp  $(C150AR) $(INCLUDES)
 #
 # Build the profile test
 #
-profile: profile.cpp  $(C150AR) $(INCLUDES) $(OBJ)
-	$(CPP) -o profile  $(CPPFLAGS) profile.cpp $(C150AR) $(OBJ) $(LDFLAGS)
+profile: profile.cpp $(C150AR) $(INCLUDES) $(OBJ)
+	$(CPP) -o profile $(CPPFLAGS) profile.cpp $(C150AR) $(OBJ) $(LDFLAGS)
 
 
 #

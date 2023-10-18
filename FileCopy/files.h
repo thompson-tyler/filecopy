@@ -71,4 +71,7 @@ void files_savepermanent(files_t *fs, int id);
 // removes <dirname>/<filename>.tmp
 void files_remove(files_t *fs, int id);
 
+// returns true if checksum_in matches checksum of <dirname>/<filename>.tmp
+bool verify_hash_tmp(files_t *fs, int id, const checksum_t checksum_in);
+
 #endif

@@ -133,23 +133,26 @@ bool idempotent_checkfile(files_t *fs, cache_t *cache, fid_t id, seq_t seqno,
     if (cache->entries[id].seqno == seqno)
         return cache->entries[id].verified ? OK : BAD;
 
-    // do check
-    checksum_t checksum;
-    SHA1(cache->entries[id].buffer, cache->entries[id].buflen, checksum);
-    bool success = memcmp(checksum, checksum_in, SHA_DIGEST_LENGTH) == 0;
+    // Check that incoming checksum matches what's in the buffer
+    checksum_t buf_checksum;
+    SHA1(cache->entries[id].buffer, cache->entries[id].buflen, buf_checksum);
+    if (memcmp(checksum_in, buf_checksum, SHA_DIGEST_LENGTH) != 0) return BAD;
 
-    // writing can still trigger BAD
-    if (success) {
-        success = files_writetmp(fs, id, cache->entries[id].buflen,
-                                 cache->entries[id].buffer, checksum);
-    }
-    cache->entries[id].verified = success;
-    errp("CHECK SUCCEEDED: %s\n", success ? "TR" : "FL");
+    // Write to tmp file
+    // Note this can fail
+    if (!files_writetmp(fs, id, cache->entries[id].buflen,
+                        cache->entries[id].buffer, checksum_in))
+        return BAD;
 
-    // new seqno means we know the answer of end2end check
+    // Do check against contents of tmp file
+    // This step is the end-to-end check. If this passes, then the file is on
+    // disk and intact
+    if (!verify_hash_tmp(fs, id, checksum_in)) return BAD;
+
     cache->entries[id].seqno = seqno;
+    cache->entries[id].verified = true;
 
-    return success ? OK : BAD;
+    return OK;
 }
 
 bool idempotent_savefile(files_t *fs, cache_t *cache, fid_t id, seq_t seqno) {

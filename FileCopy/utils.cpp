@@ -62,3 +62,8 @@ unsigned long fnv1a_hash(const void *data, int size) {
     }
     return (unsigned long)hash;
 }
+
+void print_hash(const unsigned char *hash) {
+    for (int i = 0; i < 20; i++) printf("%02x", hash[i]);
+    printf("\n");
+}

@@ -7,6 +7,7 @@
 #include <cstring>
 #include <string>
 
+#include "c150nastyfile.h"
 #include "c150network.h"
 #include "packet.h"
 #include "settings.h"
@@ -137,29 +138,21 @@ bool files_writetmp(files_t *fs, int id, int nbytes, const void *buffer_in,
     assert(buffer_in && fs);
     assert(nbytes > 0);
 
-    // file open
+    // filename setup
     char tmpname[FULLNAME];
     mkfullname(tmpname, fs->dirname, mktmpname(fs->files[id].filename));
-    assert(fs->nfp->fopen(tmpname, "w+b"));
-
-    checksum_t checksum;
 
     int attempts = 0;
-    do {
-        uint8_t *buffer = nullptr;
-        fs->nfp->fseek(0, SEEK_SET);
+    while (attempts++ < DISK_RETRIES(fs->nastiness)) {
+        // Try writing to disk
+        assert(fs->nfp->fopen(tmpname, "w+b"));
         fs->nfp->fwrite(buffer_in, 1, nbytes);
-        int len = fmemread_secure(fs->nfp, fs->nastiness, &buffer, checksum);
-        assert(len == nbytes);
-        free(buffer);
-        if (memcmp(checksum_in, checksum, SHA_LEN) == 0) {
-            fs->nfp->fclose();
-            return true;
-        }
-    } while (++attempts < DISK_RETRIES(fs->nastiness));
+        fs->nfp->fclose();
+
+        if (verify_hash_tmp(fs, id, checksum_in)) return true;
+    }
 
     errp("Total Disk Failure sending SOS\n");
-    fs->nfp->fclose();
     return false;
 }
 
@@ -250,4 +243,22 @@ int fmemread_naive(NASTYFILE *nfp, uint8_t **buffer_pp) {
     int len = nfp->fread(*buffer_pp, 1, nbytes);
     verify(len == nbytes);
     return len;
+}
+
+bool verify_hash_tmp(files_t *fs, int id, const unsigned char *checksum_in) {
+    assert(fs && checksum_in);
+
+    // Construct filename of tmp file
+    char filename[FULLNAME];
+    mkfullname(filename, fs->dirname, mktmpname(fs->files[id].filename));
+
+    // Use secure read to generate checksum of tmp file's contents
+    uint8_t *buffer = nullptr;
+    checksum_t checksum;
+    assert(fs->nfp->fopen(filename, "rb"));
+    fmemread_secure(fs->nfp, fs->nastiness, &buffer, checksum);
+    fs->nfp->fclose();
+    free(buffer);
+
+    return memcmp(checksum, checksum_in, SHA_LEN) == 0;
 }
