@@ -5,6 +5,7 @@
 
 #include <cstdio>
 #include <cstring>
+#include <string>
 
 #include "c150network.h"
 #include "packet.h"
@@ -12,6 +13,7 @@
 #include "utils.h"
 
 using namespace C150NETWORK;
+using namespace std;
 
 #define SHA_LEN SHA_DIGEST_LENGTH
 #define mktmpname(fname)                                                    \
@@ -181,36 +183,58 @@ void files_remove(files_t *fs, int id) {
 // Needs to have <nastiness> matching reads
 int fmemread_secure(C150NastyFile *nfp, const int nastiness,
                     uint8_t **buffer_pp, unsigned char checksum_out[]) {
-    verify(buffer_pp && *buffer_pp == nullptr);
-    assert(checksum_out);
+    assert(buffer_pp && *buffer_pp == nullptr && checksum_out);
 
+    // Setup total file buffer
+    nfp->fseek(0, SEEK_END);
+    int filesize = nfp->ftell();
+    *buffer_pp = (uint8_t *)malloc(filesize);
+    assert(*buffer_pp);
+
+    // Set up checksum array
     auto checksums = new unsigned char[DISK_RETRIES(nastiness)][SHA_LEN];
-    for (int i = 0; i < DISK_RETRIES(nastiness); i++) {  // for each try
-        uint8_t *buffer = nullptr;
-        int buflen = fmemread_naive(nfp, &buffer);
-        verify_or_free(buffer && buflen > 0, buffer);
 
-        SHA1(buffer, buflen, checksums[i]);
-        int matches = 0;
-        for (int j = 0; j < i; j++)  // for each past checksum
-            matches += memcmp(checksums[j], checksums[i], SHA_LEN) == 0;
+    // Read the file in chunks of size READ_CHUNK_SIZE +- (a random number),
+    // verifying each chunk as we go
+    for (int offset = 0, chunk_size; offset < filesize; offset += chunk_size) {
+        // Compute random chunk size
+        chunk_size = READ_CHUNK_SIZE + (rand() % (CHUNK_SIZE_RANDOMNESS * 2) -
+                                        CHUNK_SIZE_RANDOMNESS);
+        // Try reading chunk until a sufficient number of reads match
+        bool verified = false;
+        uint8_t *chunk_buf = *buffer_pp + offset;
+        for (int i = 0; i < DISK_RETRIES(nastiness); i++) {
+            nfp->fseek(offset, SEEK_SET);
+            int chunk_len = nfp->fread(chunk_buf, 1, chunk_size);
+            assert(chunk_len);
+            SHA1(chunk_buf, chunk_len, checksums[i]);
 
-        if (matches >= MATCHING_READS(nastiness)) {
-            *buffer_pp = buffer;
-            memcpy(checksum_out, checksums[i], SHA_LEN);
-            delete[] checksums;
-            return buflen;
+            int matches = 0;
+            for (int j = 0; j < i; j++)  // for each past checksum
+                matches += memcmp(checksums[j], checksums[i], SHA_LEN) == 0;
+
+            if (matches >= MATCHING_READS(nastiness)) {
+                verified = true;
+                break;
+            }
         }
-
-        free(buffer);  // free the bad buffer
-        if (i > 1) debug("failed read of file for %ith time\n", i);
+        if (!verified) {
+            errp(
+                "Disk failure -- unable to reliably read section in %d "
+                "attempts\n",
+                DISK_RETRIES(nastiness));
+            free(*buffer_pp);
+            *buffer_pp = nullptr;
+            delete[] checksums;
+            return -1;
+        }
     }
-
-    fprintf(stderr,
-            "Disk failure -- unable to reliably open file in %d attempts\n",
-            DISK_RETRIES(nastiness));
     delete[] checksums;
-    return -1;
+
+    // Compute the checksum of the whole file
+    SHA1(*buffer_pp, filesize, checksum_out);
+
+    return filesize;
 }
 
 // Read whole input file (mostly taken from Noah's samples)

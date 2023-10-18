@@ -34,6 +34,9 @@ int main(int argc, char **argv) {
 
     setup_logging("serverlog.txt", argc, argv);
 
+    // Set random seed
+    srand(time(NULL));
+
     if (argc != 4) {
         fprintf(stderr,
                 "Usage: %s <networknastiness> <filenastiness> <targetdir>\n",
@@ -44,7 +47,13 @@ int main(int argc, char **argv) {
     // Parse arguments
     int network_nastiness = atoi(argv[1]);
     int file_nastiness = atoi(argv[2]);
-    char *targetdir = argv[3];
+    string targetdir_str = argv[3];
+
+    // Add trailing '/' to srcdir if necessary
+    if (targetdir_str.back() != '/') {
+        targetdir_str += '/';
+    }
+    auto targetdir = (char *)targetdir_str.c_str();
 
     check_directory(argv[3]);
 

@@ -23,6 +23,9 @@ int main(int argc, char **argv) {
     // GRADEME(argc, argv);
     setup_logging("clientlog.txt", argc, argv);
 
+    // Set random seed
+    srand(time(NULL));
+
     if (argc != 5) {
         fprintf(
             stderr,
@@ -35,7 +38,13 @@ int main(int argc, char **argv) {
     char *server_name = argv[1];
     int network_nastiness = atoi(argv[2]);
     int file_nastiness = atoi(argv[3]);
-    char *srcdir = argv[4];
+    string srcdir_str = argv[4];
+
+    // Add trailing '/' to srcdir if necessary
+    if (srcdir_str.back() != '/') {
+        srcdir_str += '/';
+    }
+    auto srcdir = (char *)srcdir_str.c_str();
 
     check_directory(argv[4]);
 

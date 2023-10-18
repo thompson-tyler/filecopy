@@ -64,6 +64,13 @@ nastyfiletest: nastyfiletest.cpp  $(C150AR) $(INCLUDES)
 	$(CPP) -o nastyfiletest  $(CPPFLAGS) nastyfiletest.cpp $(C150AR)
 
 #
+# Build the profile test
+#
+profile: profile.cpp  $(C150AR) $(INCLUDES) $(OBJ)
+	$(CPP) -o profile  $(CPPFLAGS) profile.cpp $(C150AR) $(OBJ) $(LDFLAGS)
+
+
+#
 # Build the sha1test
 #
 sha1test: sha1test.cpp

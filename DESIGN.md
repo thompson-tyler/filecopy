@@ -76,6 +76,7 @@ This module **adapts** to the nastiness level by requiring 5 matching reads for 
 
 At a certain point, which is also adaptive to `nastiness`,
 the read will give up and declare an unfixable disk error, which will try to trigger an SOS.
+It has been observed that this only occurs once in every 3000-or-so reads.
 
 For write functionality, we again repeatedly write, then read and hash to ensure the write was correct.
 
@@ -148,7 +149,7 @@ the idempotence of each action.
 
 \* This is used as part of the self healing for recovering from and old process
 
-# The protocol
+# The Protocol
 
 A big theme of this protocol is to make the server very simple and letting the
 client handle most of the intelligence. There are 7 packet types which work
@@ -162,6 +163,10 @@ together to transfer files:
 - `KEEP`
 - `DELETE`
 
+## Process
+
+The protocol works in 4 distinct steps:
+
 ### 1. Prepare for file
 
 When the client wishes to transfer a new file, it sends a `PREPARE` packet containing the filename, file length, and the number of parts (or "sections") the file will be broken into. Since each packet has a maximum size of around 500 bytes, some of the larger files we tested need to be broken into over 6000 sections. The client then waits for the server to respond with an `ACK` before moving on to sending sections.
@@ -174,7 +179,7 @@ Once the client has received an `ACK` for the `PREPARE`, it sends a barrage of `
 
 When the server receives a `SECTION`, it ensures that is has a cache entry for the corresponding file. If it does, then it checks whether it has received that section before, and saves it if it's a new section, then responds with an `ACK`. This ensures that duplicate `SECTION`s are still ACK'd but have the same effect, giving the property of idempotence. If the server did not recognize the file that the section was for (i.e. it did not receive a `PREPARE`), then it sends an `SOS` message back to the client, indicating that it needs to restart the transfer process.
 
-### 3. Check
+### 3. Check (end-to-end)
 
 After sending all the sections of a file and receiving ACKs for each, the client sends the hash for the entire file to the server in a `CHECK` packet. If the client then receives an `ACK`, then it knows the file is good, and if it receives an `SOS` then it knows the file transfer did not succeed and it restarts the transfer for that file.
 
@@ -184,19 +189,25 @@ When the server receives a `CHECK` packet, it checks the following:
 2. That is has received all sections for the file
 3. That the server-side data hashes to the correct hash
 
-If any of these checks fail, then the server responds with `SOS` which triggers a restart of the transfer. Otherwise, the server saves the file to disk and responds with an `ACK`. If the file was already previously checked, then the server does nothing and responds with the result of that previous check, either a successful `ACK` or a failing `SOS`.
+If any of these checks fail, then the server responds with `SOS` which triggers a restart of the transfer. Otherwise, the server saves the file to disk (marked as TMP) and responds with an `ACK`. TMP is short for temporary; the server saves files with the extension `.TMP` since the file *could* still be deleted in the next step. If the file was already previously checked, then the server does nothing and responds with the result of that previous check, either a successful `ACK` or a failing `SOS`.
 
-### 4. Wrap up
+### 4. Keep or Delete
 
-Once a file is checked
+Once a file is checked, the client will either send a `KEEP` or `DELETE` packet, which both tell the server what to do with the TMP file created in step 3.
+
+When receiving a `KEEP` packet, the server checks whether it has a TMP file for that id. If it does then it removes the TMP indicator which cements the file as completed, and responds with `ACK`. If it does not have the indicated TMP file, it responds with `SOS` indicating that something has gone horribly wrong.
+
+If the client hears an `ACK`, then the file transfer process is complete! Huzzah! Though if it receives an `SOS` then the client restarts the whole process at step 1.
+
+Why does the `DELETE` packet exist? That's an excellent question. `DELETE` gives the client freedom to roll back if it finds something has gone wrong after the check step. Though in the current implementation this never happens. Removing this step and assuming `KEEP` was discussed but in the spirit of giving the client agency, it remains.
 
 ## Packet Structure
 
 \small
 
 ```
-| i32 type | HEADER                     | DATA                                             |
-| -------- | -------------------------- | ------------------------------------------------ |
+| i32 type | HEADER  | DATA    |
+| -------- | ------- | ------- |
 | SOS      | i32 len | i32 seq | i32 id | i32 maxseq      |                 |              |
 | ACK      | i32 len | i32 seq | i32 id | i32 maxseq      |                 |              |
 | PREPARE  | i32 len | i32 seq | i32 id | i8[80] filename | i32 file length | i32 nparts   |
@@ -252,6 +263,16 @@ It is always assumed that these messages come in any order and may be duplicated
 
 The `Packet` data structure is represented as a `struct` and written to be
 easily serializable.
+
+## When Things Go Wrong
+
+This entire protocol has been designed so that each step should succeed nearly 100% of the time. This is achieved with reliability tools such as the `files` module — which provides reliable disk reads — and the `messenger` module — which provides reliable packet transfer. However, the protocol still treats each step as if it could fail often. Each step is allowed to trigger an `SOS`, which triggers the client to go back and restart the transfer process. The beauty of this is that the reliability tools mentioned are only *optimizations*. In fact, the protocol would eventually succeed even if both the disk reads and packet transfer tools were highly unreliable, and still guarantees correctness because of the check (end-to-end) step.
+
+The challenge of dealing with duplicate packets was solved by making all of the server "actions" idempotent. For example, if the server receives a duplicate `SECTION` packet, then it *still* responds with an `ACK` but takes no further action. This also solves the case when an `ACK` is dropped and the client re-sends a section. This design choice hugely simplifies the protocol since far less state needs to be maintained between the client and the server. The client keeps tracks of where it's at in the process, and the server simply acts.
+
+## Effectiveness
+
+In its current implementation, this protocol reliable transfers files 
 
 ## Gradelogs
 
