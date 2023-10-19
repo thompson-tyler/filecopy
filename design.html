@@ -1,0 +1,371 @@
+<h1 id="report-for-remote-file-copy">Report for Remote File Copy</h1>
+<h3 id="cs117-jacob-zimmerman-and-tyler-thompson">CS117 Jacob Zimmerman
+and Tyler Thompson</h3>
+<h1 id="introduction">Introduction</h1>
+<p>There will be several isolated components, all of which are, to the
+best of our ability, the bare minimum of cleverness that they need to
+be.</p>
+<p>A major inspiration for this design was a quotation from Joe
+Armstrong who developed the Erlang BEAM machine:</p>
+<p><em>‘It was during this conference that we realised that the work we
+were doing on Erlang was very different from a lot of mainstream work in
+telecommunications programming. Our major concern at the time was with
+detecting and recovering from errors. I remember Mike, Robert and I
+having great fun asking the same question over and over again: “what
+happens if it fails?” – the answer we got was almost always a variant on
+“our model assumes no failures.” We seemed to be the only people in the
+world designing a system that could recover from software
+failures.’</em></p>
+<p>Rather than build an intricate, robust system to prevent failure, the
+goal of this system is to have everything be simple enough that failures
+can be <strong>self-healing</strong>. Allowing us to prioritize designs
+that are <em>stupid</em> rather than <em>smart</em>.</p>
+<p>In our system <em>smartness</em> is an optimization.</p>
+<<<<<<< HEAD
+=======
+
+>>>>>>> c89c676 (report)
+<p>Because of this, our system is inherently agnostic to chronology.
+Files could be tranferred concurrently. In fact <strong>both</strong>
+the client and server processes can be killed and restarted at any point
+in a single file transfer, and the protocol is able to heal and
+succeed.*</p>
+<p>We spent a whole week devising this system before writing any code,
+and once we had all our stupid <code>C++</code> bugs sorted, it worked
+pretty much first time.</p>
+<p>*Adding this feature to our initial design took only 4 extra lines of
+code, the power of <em>stupidity</em>.</p>
+<h3 id="successful-cases">Successful cases</h3>
+<p>In its current implementation, this program can reliably transfer
+files at all levels of network and disk nastiness. It correctly
+transfers the provided <code>SRC</code> directory in about 3 minutes at
+full nastiness. It also correctly transfers binary files. In fact, we
+transferred the <code>fileclient</code> executable itself and it ran
+perfectly! <em>Now to make it into a worm…</em></p>
+<h4 id="some-terminology">Some terminology</h4>
+<ul>
+<li><strong>Smart</strong> vs <strong>stupid</strong> is another way of
+saying selfconscious vs unselfconscious</li>
+<li>A <strong>message</strong> is a requested action that is conveyed
+over a network</li>
+<li>A <strong>id</strong> is a number that we associate with a
+filename</li>
+<li>A <strong>module</strong> is a set of related functions</li>
+</ul>
+<h1 id="modules">Modules</h1>
+<h2 id="the-packet-module">The <code>packet</code> module</h2>
+<p>This module defines the structs representing packets as defined
+below, as well as a number of functions used to easily construct those
+packets. All packets are easily sent over the network because they are
+implemented as tagged unions which contain no pointers, therefore they
+are serialized and deserialized easily via C-style casts.</p>
+<h2 id="the-files-module">The <code>files</code> module</h2>
+<p>Provides functions to reliably read files from disk and a data
+structure <code>files_t</code> which stores metadata of the files on
+disk — it doesn’t store file contents.</p>
+<p>This module uses a nasty file pointer under the hood, but provides
+the user with reliable file reading and writing. Reliable file reading
+is achieved with the following process:</p>
+<ol type="1">
+<li>Split the file into chunks of <code>N</code> bytes, where
+<code>N</code> is chosen randomly in the range
+<code>[900, 1100]</code></li>
+<li>For each chunk, read and hash the chunk repeatedly until the same
+hash appears at least <code>M</code> times</li>
+<li>When a hash appears a sufficient number of times, return the
+corresponding read</li>
+<li>Repeat for all chunks</li>
+</ol>
+<p><strong>Why are files reads split into chunks?</strong> Files are
+read in chunks because it was observed that large reads were far more
+prone to corruption than smaller reads. Reads of about 1000 bytes seemed
+to be quite reliable (~80% uncorrupted rate) while maintaining quick
+file reads overall.</p>
+<p><strong>Why are chunk sizes randomly chosen?</strong> While the
+repeat hash process is good, it does not provide 100% accurate reads.
+Also, it was observed that corruption on a file often occurs in the same
+way (eg. the fourth byte is overwritten with a <code>'.'</code>).
+Because of this, it is possible that two independent file reads generate
+the same corrupted data. To essentially eliminate the odds of this
+occurring, chunk sizes are randomized so that corruption is also
+randomized, making a “corruption collision” nearly impossible.</p>
+<p><strong>How is <code>M</code> chosen?</strong> Since lower nastiness
+levels have significantly lower corruption rates, <code>M</code> is set
+based on the disk nastiness setting. This allows lower nastiness
+settings to read much quicker. In the implementation it was made to be
+<code>M = 3 * disk_nastiness</code>.</p>
+<p>If <code>M</code> matching hashes are not achieved by
+<code>4 * M</code> reads, the read will fail declare an unfixable disk
+error, which will trigger an SOS.</p>
+<p>The <code>files</code> module uses this reliable read mechanism to
+convert a file into the all the necessary packets to transfer the file,
+including correct checksum.</p>
+<p>To achieve reliable writes, data is first written to disk, then read
+using the reliable reader, and compared to the original data. If it
+matches, then the data was successfully written. Otherwise, the process
+is repeated until successful, or a repeat threshold is hit at which
+point an SOS is triggered.</p>
+<p>The reliability mechanisms of this module are a sort of personal
+end-to-end check just for disk IO. That being said, they are entirely
+separate from the real end-to-end check performed later, and are no more
+than an optimization ahead of resending. We want to stress this point,
+<strong><em>the complexity of this module is an optimization, not a
+feature of the protocol. If this module just returned the result of the
+first nasty read, then the protocol would still eventually succeed,
+albeit much slower.</em></strong></p>
+<h2 id="the-messenger-module">The <code>messenger</code> module</h2>
+<p>Contains functions to reliably send packets over the network or send
+a collection of files to the server. A <code>messenger_t</code> struct
+must be initialized with a “nasty socket” and the nastiness used for
+that socket. The messenger functions will adapt to the nastiness level
+and allow for a greater number of retries under higher nastiness levels.
+It also contains a monotonically increasing (though not necessarily
+linear), sequence counter used to order each outgoing packet.</p>
+<p>Sending via a <code>messenger</code> <em>guarantees</em> that the
+receiver has responded, and is aware of the message.</p>
+<p>The module has functions to send either an array of packets or a
+<code>files_t</code> instance containing files to send. The file sending
+function utilizes the packet sending function, but first splits the
+files up and sends the whole sequence of packets necessary to fully
+transfer each file.</p>
+<p>As long as the protocol is followed, multiple files could be
+transferred concurrently, though we don’t actually do this.</p>
+<p>Both packet sending and file sending give a best effort attempt, and
+fail after a certain number of retries, the number of retries is
+adaptive to network <code>nastiness</code>. In practice, this limit has
+only been hit when the server isn’t actually running.</p>
+<p>After a file is sent, this module also performs an end-to-end check
+for that file by hashing it and asking the server to compare the hashes.
+If the check fails, then the transfer is retried until it succeeds, or
+retry threshold is hit.</p>
+<p>If a message that is sent is responded with via an <code>SOS</code>,
+the transfer of that file restarts.</p>
+<h2 id="the-cache-module">The <code>cache</code> module</h2>
+<p>This module takes inspiration from walls (which are
+underappreciated). It provides one real function called
+<code>bounce</code> that takes in a packet, tries to perform the
+requested action, and returns a new packet <code>ACK</code> if the
+action was successful, and <code>SOS</code> otherwise.</p>
+<p>This module is meant to be used entirely by the server, and is used
+to interpret and act on incoming packets. It provides a number of
+idempotent functions which correspond to the actions requested by
+various packet types. These functions are designed to be called multiple
+times safely so that duplicate packets have no adverse effect. This is
+achieved with a combination of checking sequence numbers and checking
+file status.</p>
+<p>Based on inferring the <code>cache</code>’s responses, a client can
+estimate the current state of the server. The server does not know it’s
+own state, and is therefore unselfconscious and
+<strong>stupid</strong>.</p>
+<p>There are internal optimizations to prevent repeated work that do not
+violate the idempotence of each action.</p>
+<h3 id="the-listen-function">The <code>listen</code> function</h3>
+<p><code>listen</code> is the main server function, it is a loop that
+does the following:</p>
+<ul>
+<li>read a packet</li>
+<li><code>bounce</code> the packet against the cache</li>
+<li>respond with the same packet metadata plus a copy of the highest
+recorded sequence number that the server has received*</li>
+</ul>
+<p>* This is used as part of the self healing for recovering from and
+old process</p>
+<h1 id="the-protocol">The Protocol</h1>
+<p>A big theme of this protocol is to make the server very simple and
+letting the client handle most of the intelligence. There are 7 packet
+types which work together to transfer files:</p>
+<ul>
+<li><code>SOS</code></li>
+<li><code>ACK</code></li>
+<li><code>PREPARE</code></li>
+<li><code>SECTION</code></li>
+<li><code>CHECK</code></li>
+<li><code>KEEP</code></li>
+<li><code>DELETE</code></li>
+</ul>
+<h2 id="process">Process</h2>
+<p>The protocol works in 4 distinct steps:</p>
+<h3 id="prepare-for-file">1. Prepare for file</h3>
+<p>When the client wishes to transfer a new file, it sends a
+<code>PREPARE</code> packet containing the filename, file length, and
+the number of parts (or “sections”) the file will be broken into. Since
+each packet has a maximum size of around 500 bytes, some of the larger
+files we tested need to be broken into over 6000 sections. The client
+then waits for the server to respond with an <code>ACK</code> before
+moving on to sending sections.</p>
+<p>After receiving a <code>PREPARE</code> packet, the server will add a
+new file entry into its cache with the metadata sent over by the client.
+The server keeps track of the sequence number the <code>PREPARE</code>
+message was sent with so that it can filter out packets from older
+failed transfers. Since the server’s actions are idempotent, if it
+received the same <code>PREPARE</code> packet more than once, it will
+<code>ACK</code> the duplicates but do nothing.</p>
+<h3 id="send-sections">2. Send sections</h3>
+<p>Once the client has received an <code>ACK</code> for the
+<code>PREPARE</code>, it sends a barrage of <code>SECTION</code>
+packets, each a different bit of the file being sent. It waits to
+receive <code>ACK</code>s for these, and removes the acknowledged ones
+from its queue.</p>
+<p>When the server receives a <code>SECTION</code>, it ensures that is
+has a cache entry for the corresponding file. If it does, then it checks
+whether it has received that section before, and saves it if it’s a new
+section, then responds with an <code>ACK</code>. This ensures that
+duplicate <code>SECTION</code>s are still ACK’d but have the same
+effect, giving the property of idempotence. If the server did not
+recognize the file that the section was for (i.e. it did not receive a
+<code>PREPARE</code>), then it sends an <code>SOS</code> message back to
+the client, indicating that it needs to restart the transfer
+process.</p>
+<h3 id="checking-end-to-end">3. Checking (end-to-end)</h3>
+<p>After sending all the sections of a file and receiving ACKs for each,
+the client sends the hash for the entire file to the server in a
+<code>CHECK</code> packet. If the client then receives an
+<code>ACK</code>, then it knows the file is good, and if it receives an
+<code>SOS</code> then it knows the file transfer did not succeed and it
+restarts the transfer for that file.</p>
+<p>When the server receives a <code>CHECK</code> packet, it checks the
+following:</p>
+<ol type="1">
+<li>That it has a file entry for the requested file</li>
+<li>That is has received all sections for the file</li>
+<li>That the server-side data hashes to the correct hash</li>
+</ol>
+<p>If any of these checks fail, then the server responds with
+<code>SOS</code> which triggers a restart of the transfer. Otherwise,
+the server keeps the file on disk (marked as TMP) and responds with an
+<code>ACK</code>. TMP is short for temporary; the server saves files
+with the extension <code>.TMP</code> since the file <em>could</em> still
+be deleted in the next step. If the file was already previously checked,
+then the server does nothing and responds with the result of that
+previous check, either a successful <code>ACK</code> or a failing
+<code>SOS</code>.</p>
+<p>Note that the third check — checking that server’s data hashes
+correctly — occurs <em>after</em> saving the temp file to disk. In this
+way, the third check is the core of the end-to-end check, since if that
+step succeeds then we’re guaranteed that the correct data has been
+transferred to the server’s disk.</p>
+<h3 id="keep-or-delete">4. Keep or Delete</h3>
+<p>Once a file is checked, the client will either send a
+<code>KEEP</code> or <code>DELETE</code> packet, which both tell the
+server what to do with the TMP file created in step 3.</p>
+<p>When receiving a <code>KEEP</code> packet, the server checks whether
+it has a TMP file for that id. If it does then it removes the TMP
+indicator which cements the file as completed, and responds with
+<code>ACK</code>. If it does not have the indicated TMP file, it
+responds with <code>SOS</code> indicating that something has gone
+horribly wrong.</p>
+<p>If the client hears an <code>ACK</code>, then the file transfer
+process is complete! Huzzah! Though if it receives an <code>SOS</code>
+then the client restarts the whole process at step 1.</p>
+<p>Why does the <code>DELETE</code> packet exist? That’s an excellent
+question. <code>DELETE</code> gives the client freedom to roll back if
+it finds something has gone wrong after the check step. Though in the
+current implementation this never happens. Removing this step and
+assuming <code>KEEP</code> was discussed but in the spirit of giving the
+client agency, it remains.</p>
+<h2 id="packet-structure">Packet Structure</h2>
+<pre><code>| i32 type | HEADER  | DATA    |
+| -------- | ------- | ------- |
+| SOS      | i32 len | i32 seq | i32 id | i32 maxseq      |                 |              |
+| ACK      | i32 len | i32 seq | i32 id | i32 maxseq      |                 |              |
+| PREPARE  | i32 len | i32 seq | i32 id | i8[80] filename | i32 file length | i32 nparts   |
+| SECTION  | i32 len | i32 seq | i32 id | i32 partno      | i32 offset      | u8[488] data |
+| CHECK    | i32 len | i32 seq | i32 id | u8[20] checksum | i8[80] filename |              |
+| KEEP     | i32 len | i32 seq | i32 id |                 |                 |              |
+| DELETE   | i32 len | i32 seq | i32 id |                 |                 |              |</code></pre>
+<ul>
+<li><p><code>len</code> is the length of the entire packet in
+bytes</p></li>
+<li><p><code>seq</code> is the sequence number assigned by the
+<code>Messenger</code>, and newer packets must have higher sequence
+numbers than older packets</p></li>
+<li><p><code>id</code> is a unique identifier assigned to each file, not
+each packet. They are assigned sequentially but it doesn’t matter how
+they’re assigned, they only need to be unique</p></li>
+<li><p><code>SOS</code> is constructed by the server as a response to a
+previous packet. SOS packets are constructed by sending the incoming
+packet back to the client with the type value changed to
+<code>SOS</code>. SOS packets trigger the client to reset whatever
+process prompted the SOS - this is the self healing mechanism. An
+<code>SOS</code> has a matching <code>seqno</code> to the packet that
+triggered it.</p></li>
+<li><p><code>ACK</code> is constructed the same as SOS. It notifies the
+client that the requested action with a matching <code>seqno</code> was
+performed successfully. The client will continue resending packets until
+it receives an ACK for them.</p></li>
+<li><p><code>PREPARE</code> is sent to indicate to the server to get
+ready for a file separated into <code>nparts</code> sections, totalling
+<code>filelength</code> bytes. The server will associate the
+<code>filename</code> with the <code>id</code> and be capable of
+receiving <code>SECTION</code> packets to reconstruct the indicated
+file.</p></li>
+<li><p><code>SECTION</code> is a section of a file, identified by its
+<code>partno</code> and placed in buffer at <code>offset</code>. The
+server expects that it had previously received a <code>PREPARE</code>
+packet for the indicated <code>id</code>.</p></li>
+<li><p><code>CHECK</code> tells the server that an end to end check for
+a specific file is necessary. The server will ensure it received all the
+file’s sections, then hash the file and compare it to
+<code>checksum</code>. Both <code>filename</code> and <code>id</code>
+are provided so that the client can also request a <code>CHECK</code>
+for a file that the target directory contained a priori. An ACK is sent
+if the file is correct and stored in a <code>.tmp</code> file. SOS is
+sent if the file is damaged, triggering a retransmission of that
+file.</p></li>
+<li><p><code>KEEP</code> tells the server to save the <code>.tmp</code>
+file matching an <code>id</code> to disk</p></li>
+<li><p><code>DELETE</code> tells the server to delete the
+<code>.tmp</code> file matching an <code>id</code></p></li>
+</ul>
+<p>It is always assumed that these messages come in any order and may be
+duplicated.</p>
+<p>The <code>Packet</code> data structure is represented as a
+<code>struct</code> and written to be easily serializable.</p>
+<h2 id="when-things-go-wrong">When Things Go Wrong</h2>
+<p>This entire protocol has been designed so that each step should
+succeed nearly 100% of the time. This is achieved with reliability tools
+such as the <code>files</code> module — which provides reliable disk
+reads — and the <code>messenger</code> module — which provides reliable
+packet transfer. However, the protocol still treats each step as if it
+could fail often. Each step is allowed to trigger an <code>SOS</code>,
+which triggers the client to go back and restart the transfer process.
+The beauty of this is that the reliability tools mentioned are only
+<em>optimizations</em>. In fact, the protocol would eventually succeed
+even if both the disk reads and packet transfer tools were highly
+unreliable, and still guarantees correctness because of the check
+(end-to-end) step.</p>
+<p>The challenge of dealing with duplicate packets was solved by making
+all of the server “actions” idempotent. For example, if the server
+receives a duplicate <code>SECTION</code> packet, then it <em>still</em>
+responds with an <code>ACK</code> but takes no further action. This also
+solves the case when an <code>ACK</code> is dropped and the client
+re-sends a section. This design choice hugely simplifies the protocol
+since far less state needs to be maintained between the client and the
+server. The client keeps tracks of where it’s at in the process, and the
+server simply acts.</p>
+<h2 id="gradelogs">Gradelogs</h2>
+<p>We included all the gradelogs that were recommended by the spec,</p>
+<ul>
+<li>Client
+<ul>
+<li>File: <name>, beginning transmission, attempt <attempt></li>
+<li>File: <name> transmission complete, waiting for end-to-end check,
+attempt <attempt></li>
+<li>File: <name> end-to-end check succeeded</li>
+<li>File: <name> end-to-end check failed</li>
+</ul></li>
+<li>Server
+<ul>
+<li>File: <name> starting to receive file</li>
+<li>File: <name> received, beginning end-to-end check</li>
+<li>File: <name> end-to-end check succeeded</li>
+<li>File: <name> end-to-end check failed</li>
+</ul></li>
+</ul>
+<p>On the client side, we also log when <code>ACK</code>s aren’t
+received for packets, and it’s resending them.</p>
+<p>The <code>files</code> module also logs when writing a file to disk
+produces a corrupted file, and if the writing process fails overall it
+logs that as well. When a file is being read, the <code>files</code>
+module waits until the end of the reading process and logs how many
+corrupted reads it found.</p>

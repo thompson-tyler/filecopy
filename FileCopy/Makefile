@@ -32,7 +32,7 @@
 
 # Do all C++ compies with g++
 CPP = g++
-CPPFLAGS = -g -Wall -Werror -I$(C150LIB) -std=c++11
+CPPFLAGS = -g -Wall -Werror -I$(C150LIB) -std=c++11 -Wno-stringop-truncation
 
 # Where the COMP 150 shared utilities live, including c150ids.a and userports.csv
 # Note that environment variable COMP117 must be set for this to work!
@@ -43,14 +43,13 @@ C150AR = $(C150LIB)c150ids.a
 LDFLAGS = -lssl -lcrypto
 INCLUDES = $(C150LIB)c150dgmsocket.h $(C150LIB)c150nastydgmsocket.h $(C150LIB)c150network.h $(C150LIB)c150exceptions.h $(C150LIB)c150debug.h $(C150LIB)c150utility.h
 
-OBJ := filecache.o messenger.o responder.o 
-OBJ += packet.o clientmanager.o diskio.o utils.o
+OBJ := cache.o messenger.o packet.o files.o utils.o
 
 TESTS = $(patsubst %.cpp,%,$(wildcard tests/*.cpp))
 
 default: fileclient fileserver
 
-all: default nastyfiletest makedatafile sha1test
+all: default profile nastyfiletest makedatafile sha1test
 
 fileclient: fileclient.cpp $(C150AR) $(INCLUDES) $(OBJ)
 	$(CPP) -o fileclient $(CPPFLAGS) fileclient.cpp $(C150AR) $(OBJ) $(LDFLAGS)
@@ -63,6 +62,13 @@ fileserver: fileserver.cpp $(C150AR) $(INCLUDES) $(OBJ)
 #
 nastyfiletest: nastyfiletest.cpp  $(C150AR) $(INCLUDES)
 	$(CPP) -o nastyfiletest  $(CPPFLAGS) nastyfiletest.cpp $(C150AR)
+
+#
+# Build the profile test
+#
+profile: profile.cpp $(C150AR) $(INCLUDES) $(OBJ)
+	$(CPP) -o profile $(CPPFLAGS) profile.cpp $(C150AR) $(OBJ) $(LDFLAGS)
+
 
 #
 # Build the sha1test
@@ -96,6 +102,6 @@ tests/%: tests/%.cpp $(OBJ) $(INCLUDES) $(C150AR)
 
 clean:
 	 rm -f nastyfiletest sha1test makedatafile fileclient fileserver \
-	 	 *.o main endtoend
+	 	 *.o main endtoend profile
 
 

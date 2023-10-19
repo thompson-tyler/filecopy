@@ -1,45 +1,51 @@
 #ifndef MESSENGER_H
 #define MESSENGER_H
 
-#include <string>
-#include <unordered_map>
-#include <vector>
-
 #include "c150dgmsocket.h"
-#include "c150grading.h"
-#include "c150nastydgmsocket.h"
+#include "files.h"
 #include "packet.h"
-#include "settings.h"
 
-class Messenger {
-   public:
-    Messenger(C150NETWORK::C150DgmSocket *sock);
-    ~Messenger();
+/* UDP wrapper */
 
-    // Sends a message and makes sure it is acknowledged.
-    // Returns true if successful, aborts and returns false if SOS (TODO: make
-    // sure this is what we want).
-    bool send_one(Packet &message);
-    bool send(vector<Packet> &messages);
-
-    // 1. Creates and sends client Message of PREPARE_FOR_BLOB and waits
-    // until it's acknowledged.
-    // 2. Then splits blob into sections and sends them, making sure all are
-    // acknowledged
-    //
-    // Returns true if successful, aborts and returns false if SOS
-    // (TODO: make sure this is what we want).
-    bool sendBlob(std::string blob, int blobid, std::string blobName);
-
-   private:
-    std::vector<Packet> partitionBlob(string blob, int blobid);
-
-    std::string read();
-
-    C150NETWORK::C150DgmSocket *m_sock;
-    seq_t m_seqno;
-
-    unordered_map<seq_t, Packet *> m_seqmap;
+struct messenger_t {
+    C150NETWORK::C150DgmSocket *sock;
+    int nastiness;
+    int seqcount;
 };
+
+/* safe UDP send and recv */
+
+/*
+ * purpose:
+ *      guarantees that the server received and executed each
+ *      packet's message
+ * params:
+ *      ptr to valid array of <n_packets> many packets
+ * returns:
+ *      false if recv SOS : true if recv ACK
+ * */
+bool send(messenger_t *m, packet_t *packets, int n_packets);
+
+/*
+ * purpose:
+ *      send all the filenames in the collection from the client
+ *
+ *      for each file
+ *         read from disk and split it into packets
+ *         send a prepare message
+ *         send all sections (could be concurrent)
+ *         send request for checksum verification
+ *           if SOS
+ *             send delete it
+ *           else
+ *             send keep it
+ *
+ *     if any give SOS try that file again until MAX_SOS
+ * params:
+ *      a fs loaded ideally by using register_fromdir()
+ * returns:
+ *      false if recv SOS : true if recv ACK
+ * */
+void transfer(files_t *fs, messenger_t *m);
 
 #endif
