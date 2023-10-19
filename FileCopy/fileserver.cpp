@@ -56,7 +56,8 @@ int main(int argc, char **argv) {
 
     // Set up socket
     C150DgmSocket *sock = new C150NastyDgmSocket(network_nastiness);
-    sock->turnOnTimeouts(1000 * SERVER_SHUTDOWN_SECONDS);
+    if (SERVER_SHUTDOWN_SECONDS > 0)
+        sock->turnOnTimeouts(1000 * SERVER_SHUTDOWN_SECONDS);
 
     c150debug->printf(C150APPLICATION,
                       "Set up server socket with nastiness %d\n",

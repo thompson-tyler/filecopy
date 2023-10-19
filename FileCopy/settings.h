@@ -14,7 +14,7 @@
 
 // Application settings
 #define CLIENT_TIMEOUT 1000
-#define SERVER_SHUTDOWN_SECONDS 30
+#define SERVER_SHUTDOWN_SECONDS 0
 
 // Messenger settings
 #define RESENDS(nastiness) (5 + 3 * (nastiness))
