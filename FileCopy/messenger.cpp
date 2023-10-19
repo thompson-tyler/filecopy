@@ -73,8 +73,10 @@ bool send(messenger_t *m, packet_t *packets, int n_packets) {
 
         // cut me some slack, im trying
         if (received) resends = RESENDS(nasty);
-        errp("%d remaining resends, after sending %d and catching %d\n",
-             resends, sent, received);
+        errp(
+            "%d remaining resends, %d remaining packets, after sending %d and "
+            "catching %d\n",
+            resends, unanswered, sent, received);
         // log when we lost packetsq
         if (received < sent) {
             *GRADING << "Didn't get ACKs for " << sent - received

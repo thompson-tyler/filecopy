@@ -19,7 +19,7 @@ using namespace std;
 
 int main(int argc, char **argv) {
     GRADEME(argc, argv);
-    setup_logging("clientlog.txt", argc, argv);
+    // setup_logging("clientlog.txt", argc, argv);
 
     // Set random seed
     srand(time(NULL));

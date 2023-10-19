@@ -29,8 +29,7 @@ void listen(C150DgmSocket *sock, files_t *files, cache_t *cache) {
 
 int main(int argc, char **argv) {
     GRADEME(argc, argv);
-
-    setup_logging("serverlog.txt", argc, argv);
+    // setup_logging("serverlog.txt", argc, argv);
 
     // Set random seed
     srand(time(NULL));
