@@ -18,9 +18,7 @@ using namespace C150NETWORK;
 using namespace std;
 
 int main(int argc, char **argv) {
-    // TODO: test and handle directories missing the '/'
-    // TODO: uncomment
-    // GRADEME(argc, argv);
+    GRADEME(argc, argv);
     setup_logging("clientlog.txt", argc, argv);
 
     // Set random seed

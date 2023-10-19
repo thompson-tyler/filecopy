@@ -7,6 +7,7 @@
 #include <cstring>
 #include <string>
 
+#include "c150grading.h"
 #include "c150nastyfile.h"
 #include "c150network.h"
 #include "packet.h"
@@ -105,7 +106,7 @@ int files_topackets(files_t *fs, int id, packet_t *prep_out,
     assert(is_file(fullname) && fs->nfp->fopen(fullname, "rb"));
 
     int len = fmemread_secure(fs->nfp, fs->nastiness, &buffer, checksum);
-    assert(len > 0);
+    if (len < 0) return -1;
     fs->nfp->fclose();
 
     const int max_data = sizeof((*sections_out)->value.section.data);
@@ -140,7 +141,8 @@ bool files_writetmp(files_t *fs, int id, int nbytes, const void *buffer_in,
 
     // filename setup
     char tmpname[FULLNAME];
-    mkfullname(tmpname, fs->dirname, mktmpname(fs->files[id].filename));
+    auto filename = fs->files[id].filename;
+    mkfullname(tmpname, fs->dirname, mktmpname(filename));
 
     int attempts = 0;
     while (attempts++ < DISK_RETRIES(fs->nastiness)) {
@@ -150,8 +152,11 @@ bool files_writetmp(files_t *fs, int id, int nbytes, const void *buffer_in,
         fs->nfp->fclose();
 
         if (verify_hash_tmp(fs, id, checksum_in)) return true;
+        *GRADING << "File: " << filename
+                 << ", failed to write to disk, attempt " << attempts << endl;
     }
-
+    *GRADING << "File: " << filename
+             << ", failed to write to disk, retrying transfer" << endl;
     errp("Total Disk Failure sending SOS\n");
     return false;
 }
@@ -212,6 +217,8 @@ int fmemread_secure(C150NastyFile *nfp, const int nastiness,
             }
         }
         if (!verified) {
+            *GRADING << "Could not reliably read file, retrying transfer"
+                     << endl;
             errp(
                 "Disk failure -- unable to reliably read section in %d "
                 "attempts\n",
@@ -230,21 +237,6 @@ int fmemread_secure(C150NastyFile *nfp, const int nastiness,
     return filesize;
 }
 
-// Read whole input file (mostly taken from Noah's samples)
-int fmemread_naive(NASTYFILE *nfp, uint8_t **buffer_pp) {
-    assert(*buffer_pp == nullptr);
-
-    nfp->fseek(0, SEEK_END);
-    int nbytes = nfp->ftell();
-    *buffer_pp = (uint8_t *)malloc(nbytes);
-    assert(*buffer_pp);
-
-    nfp->fseek(0, SEEK_SET);
-    int len = nfp->fread(*buffer_pp, 1, nbytes);
-    verify(len == nbytes);
-    return len;
-}
-
 bool verify_hash_tmp(files_t *fs, int id, const unsigned char *checksum_in) {
     assert(fs && checksum_in);
 
@@ -256,7 +248,8 @@ bool verify_hash_tmp(files_t *fs, int id, const unsigned char *checksum_in) {
     uint8_t *buffer = nullptr;
     checksum_t checksum;
     assert(fs->nfp->fopen(filename, "rb"));
-    fmemread_secure(fs->nfp, fs->nastiness, &buffer, checksum);
+    if (fmemread_secure(fs->nfp, fs->nastiness, &buffer, checksum) < 0)
+        return false;
     fs->nfp->fclose();
     free(buffer);
 

@@ -80,6 +80,7 @@ bool idempotent_prepareforfile(files_t *fs, cache_t *cache, fid_t id,
         return OK;
 
     // got a brand new prepare!!
+    *GRADING << "File: " << filename << " starting to receive file" << endl;
     if (cache->entries[id].recvparts == nullptr)
         files_register(fs, id, filename, true);
 
@@ -133,21 +134,34 @@ bool idempotent_checkfile(files_t *fs, cache_t *cache, fid_t id, seq_t seqno,
     if (cache->entries[id].seqno == seqno)
         return cache->entries[id].verified ? OK : BAD;
 
+    *GRADING << "File: " << filename << " received, beginning end-to-end check"
+             << endl;
+
     // Check that incoming checksum matches what's in the buffer
     checksum_t buf_checksum;
     SHA1(cache->entries[id].buffer, cache->entries[id].buflen, buf_checksum);
-    if (memcmp(checksum_in, buf_checksum, SHA_DIGEST_LENGTH) != 0) return BAD;
+    if (memcmp(checksum_in, buf_checksum, SHA_DIGEST_LENGTH) != 0) {
+        *GRADING << "File: " << filename << " end-to-end check failed" << endl;
+        return BAD;
+    }
 
     // Write to tmp file
     // Note this can fail
     if (!files_writetmp(fs, id, cache->entries[id].buflen,
-                        cache->entries[id].buffer, checksum_in))
+                        cache->entries[id].buffer, checksum_in)) {
+        *GRADING << "File: " << filename << " end-to-end check failed" << endl;
         return BAD;
+    }
 
     // Do check against contents of tmp file
     // This step is the end-to-end check. If this passes, then the file is on
     // disk and intact
-    if (!verify_hash_tmp(fs, id, checksum_in)) return BAD;
+    if (!verify_hash_tmp(fs, id, checksum_in)) {
+        *GRADING << "File: " << filename << " end-to-end check failed" << endl;
+        return BAD;
+    }
+
+    *GRADING << "File: " << filename << " end-to-end check succeeded" << endl;
 
     cache->entries[id].seqno = seqno;
     cache->entries[id].verified = true;
