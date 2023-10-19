@@ -1,3 +1,172 @@
+<!doctype html>
+<!-- 
+ **********************************************************
+
+             TUFTS CS 117 HOMEWORK ASSIGNMENT
+
+        Fill in your name, e-mail and answers to questions
+        in the sections provided below.
+
+          All questions are marked up: <li class="q">
+          All answers are marked up:   <li class="a">
+
+
+     PLEASE DO NOT MODIFY ANY THING OTHER THAN THE 
+     NAME, E-MAIL, AND ANSWER FIELDS (you may also add
+     css declarations in the <head> if you need them,
+     but usually you won't.
+
+ **********************************************************
+ -->
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Tufts CS 117 Assignment &#8212; File Copy Project Report</title>
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="https://www.cs.tufts.edu/comp/117/style/homework.css"
+    />
+  </head>
+
+  <body class="homework">
+    <!-- ******************************************************
+	   YOU MUST FILL IN YOUR NAME, UTLN AND EMAIL BELOW!!
+         (You may copy this from an earlier assignment
+                         if you like)
+
+     ****************************************************** -->
+
+    <div class="student">
+      <p>
+        <span class="label">Student1 name: </span>
+        Jacob Zimmerman
+        <br />
+
+        <span class="label">UTLN: </span>
+        jzimme04
+        <br />
+
+        <span class="label">E-mail: </span>
+        <!-- DON'T FORGET UP UPDATE THE MAILTO: URI BELOW ALONG WITH
+     YOUR EMAIL IN THE ANCHOR.  IT SHOULD LOOK LIKE:
+ <a href="mailto:lady.gaga@cs.tufts.edu">lady.gaga@cs.tufts.edu</a>
+-->
+
+        <a href="mailto:jacob.zimmerman@tufts.edu">jacob.zimmerman@tufts.edu</a>
+        <br />
+        <br />
+        <br />
+        <span class="label">Student2 name: </span>
+        Tyler Thompson
+        <br />
+        <span class="label">UTLN: </span>
+        tthomp07
+        <br />
+
+        <span class="label">E-mail: </span>
+        <!-- DON'T FORGET UP UPDATE THE MAILTO: URI BELOW ALONG WITH
+     YOUR EMAIL IN THE ANCHOR.  IT SHOULD LOOK LIKE:
+ <a href="mailto:lady.gaga@cs.tufts.edu">lady.gaga@cs.tufts.edu</a>
+-->
+
+        <a href="mailto:tyler.thompson@tufts.edu">tyler.thompson@tufts.edu</a>
+
+        <br />
+      </p>
+    </div>
+
+    <div class="UpperLeftHeader">
+      <p>
+        Tufts CS 117 (Fall 2023):
+        <br />
+        Internet-scale Distributed Systems
+      </p>
+    </div>
+
+    <!-- - - - - - - - - - - - - - - - - - - - - - - -
+		HOMEWORK TITLE
+  - -  - - - - - - - - - - - - - - - - - - - - - - -->
+
+    <div class="headerdiv">
+      <h1>
+        Tufts CS 117:<br />
+        File Copy Project Report
+      </h1>
+    </div>
+
+    <!-- ******************************************************
+
+              PLEASE ANSWER QUESTIONS IN THE SECTIONS
+	      LABELED class="a" (for answer)
+
+     ****************************************************** -->
+
+    <div class="main">
+      <h2 id="questions">Questions</h2>
+      <!-- - - - - - - - - - - - - - - - - - - - - - - -
+		QUESTION
+  - -  - - - - - - - - - - - - - - - - - - - - - - -->
+      <div class="qa">
+        <ol class="qa">
+          <li class="q">
+            What are the highest "nastiness" levels at which you believe your
+            program will successfully copy an entire directory full of files?
+            (We will test your programs using those levels on both the client
+            and the server; if all you got working was the end-to-end check,
+            then please tell us how to test your work.
+            <em
+              >Also: if high network nastiness messes up your ability to deal
+              with file nastiness, you can give us two pairs: e.g. Test my
+              client and server with networknastiness=4 and filenastiness=1 or
+              networknastiness=0 and filenastiness=3)</em
+            >
+          </li>
+          <li class="a">
+            <!-- replace XX and YY with the actual values -->
+            Please test my client and server with: networknastiness=4 and
+            filenastiness=5.
+          </li>
+
+          <li class="q">
+            Is there anything else we should know about testing your code, or
+            what you expect it to do (beyond what's explained in your report
+            below)?
+          </li>
+          <li class="a">
+            Try killing and restarting the process mid-transfer! It doesn't
+            support long filenames, aim for significantly less than 80
+            characters.
+            <br>
+            Also our report html was generated with pandoc, but it 
+            created pretty buggy html. It will NOT pass validation, sorry. 
+            <br>
+            We also have a pdf version we can submit that is more readable.
+          </li>
+
+          <li class="q">
+            Did you get help from anyone other than your teammate? If "yes",
+            then briefly explain who helped you and how.
+          </li>
+          <li class="a">Nope, maybe some reading about erlang and tcp</li>
+
+          <li class="q">
+            (optional) Do you have any other comments on this assignment (e.g.
+            was it worthwhile, what did you learn from it, do you have
+            suggestions for improvment if the course is offered again)?
+          </li>
+          <li class="a">
+            It's a great assignment, pretty worthwhile. It would be great to
+            have a C-style interface and open it up to other languages as well
+            though, most of the time wasted came from C++ quirks.
+          </li>
+        </ol>
+
+        <!-- * * * * * * * * * * * * * * * * * * * * * -->
+        <!--            REPORT GOES HERE               -->
+        <!-- * * * * * * * * * * * * * * * * * * * * * -->
+
 <h1 id="report-for-remote-file-copy">Report for Remote File Copy</h1>
 <h3 id="cs117-jacob-zimmerman-and-tyler-thompson">CS117 Jacob Zimmerman
 and Tyler Thompson</h3>
@@ -21,18 +190,16 @@ goal of this system is to have everything be simple enough that failures
 can be <strong>self-healing</strong>. Allowing us to prioritize designs
 that are <em>stupid</em> rather than <em>smart</em>.</p>
 <p>In our system <em>smartness</em> is an optimization.</p>
-<<<<<<< HEAD
-=======
-
->>>>>>> c89c676 (report)
 <p>Because of this, our system is inherently agnostic to chronology.
 Files could be tranferred concurrently. In fact <strong>both</strong>
 the client and server processes can be killed and restarted at any point
 in a single file transfer, and the protocol is able to heal and
 succeed.*</p>
 <p>We spent a whole week devising this system before writing any code,
-and once we had all our stupid <code>C++</code> bugs sorted, it worked
-pretty much first time.</p>
+and once we had all our stupid <code>C++</code> bugs sorted, we realized that file corruptions are sometimes deterministic.
+Because of some optimizations we made, this caused identical corruption on the server and client,
+meaning the "ends" of our end to end weren't reliable either. After fixing this, it worked
+pretty much first time with max settings.</p>
 <p>*Adding this feature to our initial design took only 4 extra lines of
 code, the power of <em>stupidity</em>.</p>
 <h3 id="successful-cases">Successful cases</h3>
@@ -369,3 +536,7 @@ produces a corrupted file, and if the writing process fails overall it
 logs that as well. When a file is being read, the <code>files</code>
 module waits until the end of the reading process and logs how many
 corrupted reads it found.</p>
+      </div>
+    </div>
+  </body>
+</html>
