@@ -212,6 +212,9 @@ int fmemread_secure(C150NastyFile *nfp, const int nastiness,
                 matches += memcmp(checksums[j], checksums[i], SHA_LEN) == 0;
 
             if (matches >= MATCHING_READS(nastiness)) {
+                if (i - matches > 0)
+                    *GRADING << "File finished reading, but got " << i - matches
+                             << " bad reads in the process" << endl;
                 verified = true;
                 break;
             }

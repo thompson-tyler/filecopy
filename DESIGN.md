@@ -275,4 +275,19 @@ The challenge of dealing with duplicate packets was solved by making all of the 
 
 ## Gradelogs
 
-**TODO**
+We included all the gradelogs that were recommended by the spec,
+
+- Client
+  - File: <name>, beginning transmission, attempt <attempt>
+  - File: <name> transmission complete, waiting for end-to-end check, attempt <attempt>
+  - File: <name> end-to-end check succeeded
+  - File: <name> end-to-end check failed
+- Server
+  - File: <name> starting to receive file
+  - File: <name> received, beginning end-to-end check
+  - File: <name> end-to-end check succeeded
+  - File: <name> end-to-end check failed
+
+On the client side, we also log when `ACK`s aren't received for packets, and it's resending them.
+
+The `files` module also logs when writing a file to disk produces a corrupted file, and if the writing process fails overall it logs that as well. When a file is being read, the `files` module waits until the end of the reading process and logs how many corrupted reads it found.

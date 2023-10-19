@@ -7,7 +7,7 @@
 /* some of these settings may become easier with increased nastiness */
 
 // Files settings
-#define DISK_RETRIES(nastiness) 4 * MATCHING_READS(nastiness)
+#define DISK_RETRIES(nastiness) 5 + 3 * MATCHING_READS(nastiness)
 #define MATCHING_READS(nastiness) 3 * nastiness
 #define READ_CHUNK_SIZE 1000
 #define CHUNK_SIZE_RANDOMNESS 100
