@@ -106,7 +106,7 @@ void transfer(files_t *fs, messenger_t *m) {
 
         // Generate all packets we need to transfer this sucker
         packet_t prep, *sections = nullptr, check;
-        if (files_topackets(fs, id, &prep, &sections, &check) < 0) {
+        if (files_topackets(fs, id, &prep, &sections, &check) <= 0) {
             *GRADING << "File: " << filename
                      << " failed to read, retrying "
                         "transfer."
@@ -121,11 +121,12 @@ void transfer(files_t *fs, messenger_t *m) {
                          << " end-to-end check succeeded" << endl;
                 attempts = 0, it++;  // onto the next one
                 continue;
-            } else {
+            } else
                 *GRADING << "File: " << filename << " end-to-end check failed"
                          << endl;
-            }
-        }
+        } else
+            *GRADING << "File: " << filename
+                     << " transfer failed, retrying send" << endl;
         if (attempts >= MAX_SOS) {
             *GRADING << "File: " << filename
                      << " hit max number of failures. Skipping it." << endl;

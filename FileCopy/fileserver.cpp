@@ -50,9 +50,9 @@ int main(int argc, char **argv) {
     if (targetdir_str.back() != '/') {
         targetdir_str += '/';
     }
-    auto targetdir = (char *)targetdir_str.c_str();
+    const char *targetdir = targetdir_str.c_str();
 
-    check_directory(argv[3]);
+    check_directory(targetdir);
 
     // Set up socket
     C150DgmSocket *sock = new C150NastyDgmSocket(network_nastiness);

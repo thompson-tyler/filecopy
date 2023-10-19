@@ -131,8 +131,7 @@ bool idempotent_checkfile(files_t *fs, cache_t *cache, fid_t id, seq_t seqno,
         if (cache->entries[id].recvparts[i] == false) return BAD;
 
     // maybe we just checked it
-    if (cache->entries[id].seqno == seqno)
-        return cache->entries[id].verified ? OK : BAD;
+    if (cache->entries[id].seqno == seqno) return cache->entries[id].verified;
 
     *GRADING << "File: " << filename << " received, beginning end-to-end check"
              << endl;
@@ -140,6 +139,10 @@ bool idempotent_checkfile(files_t *fs, cache_t *cache, fid_t id, seq_t seqno,
     // Check that incoming checksum matches what's in the buffer
     checksum_t buf_checksum;
     SHA1(cache->entries[id].buffer, cache->entries[id].buflen, buf_checksum);
+
+    cache->entries[id].seqno = seqno;
+    cache->entries[id].verified = BAD;
+
     if (memcmp(checksum_in, buf_checksum, SHA_DIGEST_LENGTH) != 0) {
         *GRADING << "File: " << filename << " end-to-end check failed" << endl;
         return BAD;
@@ -163,7 +166,6 @@ bool idempotent_checkfile(files_t *fs, cache_t *cache, fid_t id, seq_t seqno,
 
     *GRADING << "File: " << filename << " end-to-end check succeeded" << endl;
 
-    cache->entries[id].seqno = seqno;
     cache->entries[id].verified = true;
 
     return OK;

@@ -36,7 +36,6 @@ using namespace std;
 
 int fmemread_secure(C150NastyFile *nfp, const int nastiness,
                     uint8_t **buffer_pp, unsigned char checksum_out[]);
-int fmemread_naive(NASTYFILE *nfp, uint8_t **buffer_pp);
 
 char *mkfullname(char *dst, const char *dirname, const char *fname) {
     assert(dst && dirname && fname);
