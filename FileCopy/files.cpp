@@ -44,8 +44,8 @@ char *mkfullname(char *dst, const char *dirname, const char *fname) {
     return dst;
 }
 
-void files_register_fromdir(files_t *fs, char *dirname, C150NastyFile *nfp,
-                            int nastiness) {
+void files_register_fromdir(files_t *fs, const char *dirname,
+                            C150NastyFile *nfp, int nastiness) {
     assert(fs && dirname && nfp && 0 <= nastiness && nastiness <= 5);
     assert(strnlen(dirname, DIRNAME_LENGTH) < DIRNAME_LENGTH);
 

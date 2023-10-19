@@ -33,7 +33,7 @@ struct files_t {
 /***************************/
 
 // allocates and populates all fields
-void files_register_fromdir(files_t *fs, char *dirname,
+void files_register_fromdir(files_t *fs, const char *dirname,
                             C150NETWORK::C150NastyFile *nfp, int nastiness);
 
 // add a file and it's metadata to the filename collector
